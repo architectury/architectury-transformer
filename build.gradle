@@ -1,0 +1,80 @@
+plugins {
+    id "java"
+    id "idea"
+    id "eclipse"
+    id "maven-publish"
+    id "com.github.johnrengelman.shadow" version "5.0.0"
+}
+
+group "me.shedaniel"
+
+def isSnapshot = System.getenv("PR_NUM") != null
+def runNumber = (System.getenv("GITHUB_RUN_NUMBER") == null ? "9999" : System.getenv("GITHUB_RUN_NUMBER"))
+
+if (!isSnapshot) {
+    version = base_version + "." + runNumber
+} else {
+    version = base_version + "-PR." + System.getenv("PR_NUM") + "." + runNumber
+}
+
+logger.lifecycle(":building architectury transformer v${version}")
+
+sourceCompatibility = targetCompatibility = 1.8
+
+repositories {
+    maven { url "https://maven.fabricmc.net/" }
+    gradlePluginPortal()
+}
+
+dependencies {
+    implementation "net.fabricmc:tiny-remapper:0.3.0.70"
+    implementation "net.fabricmc:tiny-mappings-parser:0.2.2.14"
+    implementation "org.ow2.asm:asm:8.0"
+    implementation "org.ow2.asm:asm-commons:8.0"
+    implementation "org.ow2.asm:asm-tree:8.0"
+    implementation "org.ow2.asm:asm-util:8.0"
+    implementation "org.zeroturnaround:zt-zip:1.13"
+    implementation "com.google.code.gson:gson:2.8.5"
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier("sources")
+    from sourceSets.main.allSource
+}
+
+jar {
+    classifier "raw"
+}
+
+shadowJar {
+    relocate "net.fabricmc", "me.shedaniel.architectury.transformer.shadowed.impl.net.fabricmc"
+    relocate "org.objectweb", "me.shedaniel.architectury.transformer.shadowed.impl.org.objectweb"
+    relocate "org.zeroturnaround", "me.shedaniel.architectury.transformer.shadowed.impl.org.zeroturnaround"
+    relocate "org.slf4j", "me.shedaniel.architectury.transformer.shadowed.impl.org.slf4j"
+    relocate "com.google", "me.shedaniel.architectury.transformer.shadowed.impl.com.google"
+    configurations = [project.configurations.compileClasspath]
+    classifier null
+}
+
+build.dependsOn shadowJar
+
+publishing {
+    publications {
+        MyPublication(MavenPublication) {
+            artifact(shadowJar)
+            artifact(sourcesJar)
+        }
+    }
+
+    repositories {
+        if (System.getenv("MAVEN_PASS") != null) {
+            maven {
+                url = "https://deploy.shedaniel.me/"
+                credentials {
+                    username = "shedaniel"
+                    password = System.getenv("MAVEN_PASS")
+                }
+            }
+        }
+    }
+}
