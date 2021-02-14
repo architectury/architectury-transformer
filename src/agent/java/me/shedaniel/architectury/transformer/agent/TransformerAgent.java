@@ -6,6 +6,10 @@ import java.util.Objects;
 public class TransformerAgent {
     private static Instrumentation instrumentation;
     
+    public static void premain(String args, Instrumentation instrumentation) {
+        agentmain(args, instrumentation);
+    }
+    
     public static void agentmain(String args, Instrumentation instrumentation) {
         if (!instrumentation.isRedefineClassesSupported()) {
             System.out.println("your instrumentation suck");
