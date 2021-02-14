@@ -72,20 +72,24 @@ task agentJar(type: Jar) {
     from sourceSets.agent.output
 }
 
+task agentSourcesJar(type: Jar, dependsOn: classes) {
+    classifier "agent-sources"
+    from sourceSets.agent.allSource
+}
+
+
 task runtimeJar(type: Jar, dependsOn: shadowJar) {
     classifier "runtime"
     manifest {
-        attributes "Main-Class": "me.shedaniel.architectury.transformer.TransformerRuntime"
+        attributes(
+                "Main-Class": "me.shedaniel.architectury.transformer.TransformerRuntime"
+        )
     }
     from {
         sourceSets.runtime.output + zipTree(shadowJar.archiveFile)
     }
     from(annotationsInjectJar.outputs) {
         into "annotations-inject"
-        rename { "injection.jar" }
-    }
-    from(agentJar.outputs) {
-        into "agent"
         rename { "injection.jar" }
     }
 }
@@ -121,6 +125,10 @@ publishing {
         runtime(MavenPublication) {
             artifact(runtimeJar)
             artifact(runtimeSourcesJar)
+        }
+        agent(MavenPublication) {
+            artifact(agentJar)
+            artifact(agentSourcesJar)
         }
     }
 

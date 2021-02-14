@@ -1,9 +1,5 @@
 package me.shedaniel.architectury.transformer;
 
-import com.sun.tools.attach.AgentInitializationException;
-import com.sun.tools.attach.AgentLoadException;
-import com.sun.tools.attach.AttachNotSupportedException;
-import com.sun.tools.attach.VirtualMachine;
 import me.shedaniel.architectury.transformer.agent.TransformerAgent;
 import me.shedaniel.architectury.transformer.handler.TinyRemapperPreparedTransformerHandler;
 import me.shedaniel.architectury.transformer.handler.TransformHandler;
@@ -23,7 +19,6 @@ import java.lang.instrument.Instrumentation;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.lang.management.ManagementFactory;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -39,7 +34,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import java.util.jar.JarFile;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import static me.shedaniel.architectury.transformer.Transform.formatDuration;
@@ -52,7 +46,6 @@ public class TransformerRuntime {
     
     public static void main(String[] args) throws Throwable {
         List<String> argsList = new ArrayList<>(Arrays.asList(args));
-        injectAgent();
         doInstrumentationStuff();
         Path propertiesPath = Paths.get(System.getProperty(PROPERTIES));
         Properties properties = new Properties();
@@ -140,13 +133,9 @@ public class TransformerRuntime {
         
         tmpJar.toFile().deleteOnExit();
         populateAddUrl().accept(tmpJar.toUri().toURL());
-
-//        take(toTransform, populateAddUrl());
         
         List<String> cp = new ArrayList<>(Arrays.asList(System.getProperty("java.class.path", "").split(File.pathSeparator)));
-        for (Path tmpPath : TMP_PATHS) {
-            cp.add(tmpPath.toAbsolutePath().toString());
-        }
+        cp.add(tmpJar.toAbsolutePath().toString());
         System.setProperty("java.class.path", String.join(File.pathSeparator, cp));
         
         Path mainClassPath = Paths.get(System.getProperty(MAIN_CLASS));
@@ -252,15 +241,6 @@ public class TransformerRuntime {
         };
     }
     
-    private static void injectAgent() throws IOException, AgentLoadException, AgentInitializationException, AttachNotSupportedException {
-        // Do horrible stuff here
-        String jvmName = ManagementFactory.getRuntimeMXBean().getName();
-        String pid = jvmName.substring(0, jvmName.indexOf("@"));
-        VirtualMachine jvm = VirtualMachine.attach(pid);
-        jvm.loadAgent(createTmpAgentJar().getAbsolutePath());
-        jvm.detach();
-    }
-    
     private static File createTmpAgentJar() throws IOException {
         File tmpAgentJar = File.createTempFile("architectury-agent", ".jar");
         tmpAgentJar.deleteOnExit();
@@ -268,33 +248,5 @@ public class TransformerRuntime {
             Files.copy(stream, tmpAgentJar.toPath(), StandardCopyOption.REPLACE_EXISTING);
         }
         return tmpAgentJar;
-    }
-    
-    private static final Set<Path> TMP_PATHS = new HashSet<>();
-    
-    static {
-        Runtime.getRuntime().addShutdownHook(new Thread(TransformerRuntime::shutdownHook));
-    }
-    
-    private static void shutdownHook() {
-        for (Path tmpPath : TMP_PATHS) {
-            try {
-                Files.deleteIfExists(tmpPath);
-            } catch (IOException exception) {
-                exception.printStackTrace();
-            }
-        }
-    }
-    
-    public static void take(Map<Path, List<Transformer>> toTransform, Consumer<URL> addUrl) throws IOException {
-        for (Map.Entry<Path, List<Transformer>> entry : toTransform.entrySet()) {
-            Path input = entry.getKey();
-            Path output = Files.createTempFile(null, ".jar");
-            TMP_PATHS.add(output);
-            
-            List<Transformer> transformers = entry.getValue();
-//            Transform.runTransformers(input, output, transformers);
-            addUrl.accept(output.toUri().toURL());
-        }
     }
 }
