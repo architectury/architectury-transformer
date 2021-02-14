@@ -12,11 +12,23 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public class TransformForgeEnvironment implements TinyRemapperTransformer {
+    private TinyTree srg;
+    private Map<String, IMappingProvider> mixinMappingCache = new HashMap<>();
+    
+    public TransformForgeEnvironment() {
+        try {
+            Path srgMappingsPath = Paths.get(System.getProperty(BuiltinProperties.MAPPINGS_WITH_SRG));
+            try (BufferedReader reader = Files.newBufferedReader(srgMappingsPath)) {
+                srg = TinyMappingFactory.loadWithDetection(reader);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+    
     @Override
     public List<IMappingProvider> collectMappings() throws Exception {
         List<IMappingProvider> providers = mapMixin();
@@ -37,16 +49,11 @@ public class TransformForgeEnvironment implements TinyRemapperTransformer {
     
     private List<IMappingProvider> mapMixin() throws IOException {
         List<IMappingProvider> providers = new ArrayList<>();
-        Path srgMappingsPath = Paths.get(System.getProperty(BuiltinProperties.MAPPINGS_WITH_SRG));
-        TinyTree srg;
-        try (BufferedReader reader = Files.newBufferedReader(srgMappingsPath)) {
-            srg = TinyMappingFactory.loadWithDetection(reader);
-        }
         
         for (String path : BuiltinProperties.MIXIN_MAPPINGS.split(File.pathSeparator)) {
             File mixinMapFile = Paths.get(path).toFile();
             if (mixinMapFile.exists()) {
-                providers.add(sink -> {
+                providers.add(mixinMappingCache.computeIfAbsent(path, p -> sink -> {
                     TinyUtils.createTinyMappingProvider(mixinMapFile.toPath(), "named", "intermediary").load(new IMappingProvider.MappingAcceptor() {
                         @Override
                         public void acceptClass(String srcName, String dstName) {
@@ -97,7 +104,7 @@ public class TransformForgeEnvironment implements TinyRemapperTransformer {
                             
                         }
                     });
-                });
+                }));
             }
         }
         

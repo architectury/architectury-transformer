@@ -61,6 +61,11 @@ public class Transform {
             public boolean canAppendArgument() {
                 return false;
             }
+    
+            @Override
+            public boolean canAddClasses() {
+                return true;
+            }
         };
         logTime(() -> {
             if (Files.isDirectory(input)) {

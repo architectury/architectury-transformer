@@ -23,7 +23,7 @@ import java.util.Objects;
 public class TransformExpectPlatform implements AssetEditTransformer, ClassEditTransformer {
     @Override
     public void doEdit(TransformerContext context, AssetEditSink sink) throws Exception {
-        if (RemapInjectables.isInjectInjectables()) {
+        if (RemapInjectables.isInjectInjectables() && context.canAddClasses()) {
             try (InputStream stream = TransformExpectPlatform.class.getResourceAsStream("/annotations-inject/injection.jar")) {
                 ZipUtil.iterate(stream, (input, entry) -> {
                     if (entry.getName().endsWith(".class")) {

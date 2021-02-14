@@ -111,6 +111,11 @@ public class TransformerRuntime {
                         public boolean canAppendArgument() {
                             return true;
                         }
+    
+                        @Override
+                        public boolean canAddClasses() {
+                            return true;
+                        }
                     }, inputInterface, new OutputInterface() {
                         @Override
                         public void addFile(String path, byte[] bytes) throws IOException {
@@ -150,6 +155,11 @@ public class TransformerRuntime {
         
                             @Override
                             public boolean canAppendArgument() {
+                                return false;
+                            }
+    
+                            @Override
+                            public boolean canAddClasses() {
                                 return false;
                             }
                         }, inputInterface, new OutputInterface() {
@@ -205,6 +215,11 @@ public class TransformerRuntime {
                 @Override
                 public boolean canAppendArgument() {
                     return true;
+                }
+    
+                @Override
+                public boolean canAddClasses() {
+                    return false;
                 }
             });
         } catch (Exception e) {

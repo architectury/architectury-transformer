@@ -6,4 +6,6 @@ public interface TransformerContext {
     boolean canModifyAssets();
     
     boolean canAppendArgument();
+    
+    boolean canAddClasses();
 }
