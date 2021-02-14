@@ -172,6 +172,7 @@ public class SimpleTransformerHandler implements TransformHandler {
         
         Path[] classpath = Stream.of(Transform.getClasspath())
                 .map(Paths::get)
+                .filter(Files::exists)
                 .toArray(Path[]::new);
         
         remapper.readClassPath(classpath);
