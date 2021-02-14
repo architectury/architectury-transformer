@@ -106,9 +106,11 @@ jar {
 shadowJar {
     relocate "net.fabricmc", "me.shedaniel.architectury.transformer.shadowed.impl.net.fabricmc"
     relocate "org.objectweb", "me.shedaniel.architectury.transformer.shadowed.impl.org.objectweb"
+    relocate "org.checkerframework", "me.shedaniel.architectury.transformer.shadowed.impl.org.checkerframework"
     relocate "org.zeroturnaround", "me.shedaniel.architectury.transformer.shadowed.impl.org.zeroturnaround"
     relocate "org.slf4j", "me.shedaniel.architectury.transformer.shadowed.impl.org.slf4j"
     relocate "com.google", "me.shedaniel.architectury.transformer.shadowed.impl.com.google"
+    relocate "javax.annotation", "me.shedaniel.architectury.transformer.shadowed.impl.javax.annotation"
     configurations = [project.configurations.compileClasspath]
     classifier null
 }
