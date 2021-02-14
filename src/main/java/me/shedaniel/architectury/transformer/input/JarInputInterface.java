@@ -4,16 +4,14 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
 public class JarInputInterface implements InputInterface {
+    private final boolean shouldCloseFs;
     private final Path path;
     private final FileSystem fs;
     private final Map<Path, byte[]> cache = new HashMap<>();
@@ -22,8 +20,21 @@ public class JarInputInterface implements InputInterface {
         this.path = path;
         Map<String, String> env = new HashMap<>();
         env.put("create", String.valueOf(Files.notExists(path)));
+        
         try {
-            this.fs = FileSystems.newFileSystem(new URI("jar:" + path.toUri()), env);
+            URI uri = new URI("jar:" + path.toUri());
+            FileSystem fs;
+            boolean shouldCloseFs = false;
+            
+            try {
+                fs = FileSystems.getFileSystem(uri);
+            } catch (FileSystemNotFoundException exception) {
+                fs = FileSystems.newFileSystem(uri, env);
+                shouldCloseFs = true;
+            }
+            
+            this.fs = fs;
+            this.shouldCloseFs = shouldCloseFs;
         } catch (IOException | URISyntaxException exception) {
             throw new RuntimeException(exception);
         }
@@ -49,7 +60,9 @@ public class JarInputInterface implements InputInterface {
     
     @Override
     public void close() throws IOException {
-        fs.close();
+        if (shouldCloseFs) {
+            fs.close();
+        }
         cache.clear();
     }
     

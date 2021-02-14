@@ -65,8 +65,6 @@ public class TransformerRuntime {
                             }
                         }, Collectors.toList())));
         
-        Path tmpJar = Files.createTempFile(null, ".jar");
-        Files.deleteIfExists(tmpJar);
         UnaryOperator<String> stripLeadingSlash = s -> {
             if (s.startsWith(File.separator)) {
                 return s.substring(1);
@@ -78,70 +76,116 @@ public class TransformerRuntime {
         for (Map.Entry<Path, List<Transformer>> entry : toTransform.entrySet()) {
             if (Files.isDirectory(entry.getKey())) {
                 Files.walk(entry.getKey()).forEach(path -> {
-                    String key = stripLeadingSlash.apply(entry.getKey().relativize(path).toString());
-                    System.out.println("[Architectury Transformer Runtime] Mark file as transformable: " + key);
-                    CLASSES_TO_TRANSFORM.put(key, entry.getValue());
+                    CLASSES_TO_TRANSFORM.put(stripLeadingSlash.apply(entry.getKey().relativize(path).toString()), entry.getValue());
                 });
             } else {
                 try (JarInputInterface inputInterface = new JarInputInterface(entry.getKey())) {
                     inputInterface.handle((path, bytes) -> {
                         String key = stripLeadingSlash.apply(path);
-                        System.out.println("[Architectury Transformer Runtime] Mark file as transformable: " + key);
-                        CLASSES_TO_TRANSFORM.put(key, entry.getValue());
+                        CLASSES_TO_TRANSFORM.put(stripLeadingSlash.apply(path), entry.getValue());
                     });
                 }
             }
         }
-        try (JarOutputInterface outputInterface = new JarOutputInterface(tmpJar)) {
-            for (Map.Entry<Path, List<Transformer>> entry : toTransform.entrySet()) {
-                Transform.runTransformers(new TransformerContext() {
-                    @Override
-                    public void appendArgument(String... args) {
-                        argsList.addAll(Arrays.asList(args));
-                        System.out.println("[Architectury Transformer Runtime] Appended Launch Argument: " + Arrays.toString(args));
-                    }
-                    
-                    @Override
-                    public boolean canModifyAssets() {
-                        return false;
-                    }
-                    
-                    @Override
-                    public boolean canAppendArgument() {
-                        return true;
-                    }
-                }, new JarInputInterface(entry.getKey()), new OutputInterface() {
-                    @Override
-                    public void addFile(String path, byte[] bytes) throws IOException {
-                        String key = stripLeadingSlash.apply(path);
-                        System.out.println("[Architectury Transformer Runtime] Added file " + key);
-                        outputInterface.addFile(key, bytes);
-                    }
-                    
-                    @Override
-                    public void modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
-                        
-                    }
-                    
-                    @Override
-                    public void close() throws IOException {
-                        
-                    }
-                }, entry.getValue());
+        List<Path> tmpJars = new ArrayList<>();
+        for (Map.Entry<Path, List<Transformer>> entry : toTransform.entrySet()) {
+            Path tmpJar = Files.createTempFile(null, ".jar");
+            tmpJars.add(tmpJar);
+            Files.deleteIfExists(tmpJar);
+            Files.copy(entry.getKey(), tmpJar);
+            try (JarOutputInterface outputInterface = new JarOutputInterface(tmpJar)) {
+                try (JarInputInterface inputInterface = new JarInputInterface(entry.getKey())) {
+                    Transform.runTransformers(new TransformerContext() {
+                        @Override
+                        public void appendArgument(String... args) {
+                            argsList.addAll(Arrays.asList(args));
+                            System.out.println("[Architectury Transformer Runtime] Appended Launch Argument: " + Arrays.toString(args));
+                        }
+        
+                        @Override
+                        public boolean canModifyAssets() {
+                            return false;
+                        }
+        
+                        @Override
+                        public boolean canAppendArgument() {
+                            return true;
+                        }
+                    }, inputInterface, new OutputInterface() {
+                        @Override
+                        public void addFile(String path, byte[] bytes) throws IOException {
+                            outputInterface.addFile(stripLeadingSlash.apply(path), bytes);
+                        }
+        
+                        @Override
+                        public void modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
+                            outputInterface.modifyFile(stripLeadingSlash.apply(path), action);
+                        }
+        
+                        @Override
+                        public void close() throws IOException {
+            
+                        }
+                    }, entry.getValue());
+                }
             }
+            
+            tmpJar.toFile().deleteOnExit();
+            populateAddUrl().accept(tmpJar.toUri().toURL());
+            
+            new PathModifyListener(entry.getKey(), path -> {
+                System.out.println("[Architectury Transformer Runtime] Detected File Modification at " + path.getFileName().toString());
+                try (JarOutputInterface outputInterface = new JarOutputInterface(tmpJar)) {
+                    try (JarInputInterface inputInterface = new JarInputInterface(entry.getKey())) {
+                        Transform.runTransformers(new TransformerContext() {
+                            @Override
+                            public void appendArgument(String... args) {
+                            }
+        
+                            @Override
+                            public boolean canModifyAssets() {
+                                return true;
+                            }
+        
+                            @Override
+                            public boolean canAppendArgument() {
+                                return false;
+                            }
+                        }, inputInterface, new OutputInterface() {
+                            @Override
+                            public void addFile(String path, byte[] bytes) throws IOException {
+                                if (path.endsWith(".class")) return;
+                                outputInterface.addFile(stripLeadingSlash.apply(path), bytes);
+                            }
+        
+                            @Override
+                            public void modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
+                                if (path.endsWith(".class")) return;
+                                outputInterface.modifyFile(stripLeadingSlash.apply(path), action);
+                            }
+        
+                            @Override
+                            public void close() throws IOException {
+            
+                            }
+                        }, entry.getValue());
+                    }
+                } catch (Exception exception) {
+                    exception.printStackTrace();
+                }
+            });
         }
         
-        tmpJar.toFile().deleteOnExit();
-        populateAddUrl().accept(tmpJar.toUri().toURL());
-        
         List<String> cp = new ArrayList<>(Arrays.asList(System.getProperty("java.class.path", "").split(File.pathSeparator)));
-        cp.add(tmpJar.toAbsolutePath().toString());
+        for (Path tmpJar : tmpJars) {
+            cp.add(tmpJar.toAbsolutePath().toString());
+        }
         System.setProperty("java.class.path", String.join(File.pathSeparator, cp));
         
         Path mainClassPath = Paths.get(System.getProperty(MAIN_CLASS));
         String mainClass = new String(Files.readAllBytes(mainClassPath), StandardCharsets.UTF_8);
         MethodHandle handle = MethodHandles.publicLookup().findStatic(Class.forName(mainClass), "main", MethodType.methodType(void.class, String[].class));
-        handle.invokeExact(argsList.toArray(new String[0]));
+        handle.invokeExact((String[]) argsList.toArray(new String[0]));
     }
     
     private static void doInstrumentationStuff() {
