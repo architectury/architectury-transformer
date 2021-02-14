@@ -76,7 +76,7 @@ public class FixForgeMixin implements AssetEditTransformer {
                         JsonObject data = refmapElement.get("data").getAsJsonObject();
                         if (data.has("named:intermediary")) {
                             JsonObject copy = data.get("named:intermediary").getAsJsonObject().deepCopy();
-                            for (Map.Entry<String, JsonElement> entry : copy.get("mappings").getAsJsonObject().entrySet()) {
+                            for (Map.Entry<String, JsonElement> entry : copy.entrySet()) {
                                 remapRefmap(entry.getValue().getAsJsonObject());
                             }
                             data.add("searge", copy);
