@@ -1,5 +1,10 @@
 package me.shedaniel.architectury.transformer;
 
+import me.shedaniel.architectury.transformer.handler.SimpleTransformerHandler;
+import me.shedaniel.architectury.transformer.handler.TinyRemapperPreparedTransformerHandler;
+import me.shedaniel.architectury.transformer.input.*;
+import me.shedaniel.architectury.transformer.transformers.BuiltinProperties;
+import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -9,15 +14,18 @@ import org.zeroturnaround.zip.commons.IOUtils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
-import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -25,44 +33,77 @@ import java.util.zip.ZipOutputStream;
 import static java.util.concurrent.TimeUnit.*;
 
 public class Transform {
-    public static void runTransformers(Path input, Path output, List<Transformer> transformers) throws IOException {
-        List<Path> taskOutputs = new ArrayList<>();
-        for (int i = 0; i < transformers.size(); i++) {
-            taskOutputs.add(Files.createTempFile("architectury-plugin", "intermediate-" + i + ".jar"));
-        }
-        
-        for (int index = 0; index < transformers.size(); index++) {
-            Transformer transformer = transformers.get(index);
-            Path i = index == 0 ? input : taskOutputs.get(index - 1);
-            Path o = taskOutputs.get(index);
-            
-            Files.deleteIfExists(o);
-            if (o.getParent() != null) Files.createDirectories(o.getParent());
-            
-            try {
-                boolean skipped = false;
-                long current = System.nanoTime();
-                try {
-                    transformer.transform(i, o);
-                } catch (TransformerStepSkipped ignored) {
-                    skipped = true;
-                }
-                if (index != 0) {
-                    Files.deleteIfExists(i);
-                }
-                long finished = System.nanoTime();
-                Duration duration = Duration.ofNanos(finished - current);
-                if (skipped) {
-                    System.out.println(":skipped transforming step " + (index + 1) + "/" + transformers.size() + " [" + transformer.getClass().getSimpleName() + "] in " + formatDuration(duration));
-                } else {
-                    System.out.println(":finished transforming step " + (index + 1) + "/" + transformers.size() + " [" + transformer.getClass().getSimpleName() + "] in "+ formatDuration(duration));
-                }
-            } catch (Throwable t) {
-                throw new RuntimeException("Failed transformer step " + (index + 1) + "/" + transformers.size() + " [" + transformer.getClass().getSimpleName() + "]", t);
+    public static String getUniqueIdentifier() {
+        return System.getProperty(BuiltinProperties.UNIQUE_IDENTIFIER);
+    }
+    
+    public static boolean isInjectInjectables() {
+        return System.getProperty(BuiltinProperties.INJECT_INJECTABLES, "true").equals("true");
+    }
+    
+    public static String[] getClasspath() {
+        return System.getProperty(BuiltinProperties.COMPILE_CLASSPATH, "true").split(File.pathSeparator);
+    }
+    
+    public static void runTransformers(Path input, Path output, List<Transformer> transformers) throws Exception {
+        TransformerContext context = new TransformerContext() {
+            @Override
+            public void appendArgument(String... args) {
+                throw new IllegalStateException();
             }
+            
+            @Override
+            public boolean canModifyAssets() {
+                return true;
+            }
+            
+            @Override
+            public boolean canAppendArgument() {
+                return false;
+            }
+        };
+        logTime(() -> {
+            if (Files.isDirectory(input)) {
+                copyDirectory(input, output);
+                try (DirectoryInputInterface inputInterface = new DirectoryInputInterface(input);
+                     DirectoryOutputInterface outputInterface = new DirectoryOutputInterface(output)) {
+                    runTransformers(context, inputInterface, outputInterface, transformers);
+                }
+            } else {
+                Files.copy(input, output, StandardCopyOption.REPLACE_EXISTING);
+                try (JarInputInterface inputInterface = new JarInputInterface(input);
+                     JarOutputInterface outputInterface = new JarOutputInterface(output)) {
+                    runTransformers(context, inputInterface, outputInterface, transformers);
+                }
+            }
+        }, "Transformed jar with " + transformers.size() + " transformer(s)");
+    }
+    
+    public static void runTransformers(TransformerContext context, InputInterface input, OutputInterface output, List<Transformer> transformers)
+            throws Exception {
+        try (SimpleTransformerHandler handler = new SimpleTransformerHandler(context)) {
+            handler.handle(input, output, transformers);
         }
-        
-        Files.move(taskOutputs.get(taskOutputs.size() - 1), output, StandardCopyOption.REPLACE_EXISTING);
+    }
+    
+    
+    public static void logTime(DoThing doThing, String task) throws Exception {
+        measureTime(doThing, (duration) -> {
+            System.out.println(task + " in " + formatDuration(duration));
+        });
+    }
+    
+    public static void measureTime(DoThing doThing, Consumer<Duration> measured) throws Exception {
+        long current = System.nanoTime();
+        doThing.doThing();
+        long finished = System.nanoTime();
+        Duration duration = Duration.ofNanos(finished - current);
+        measured.accept(duration);
+    }
+    
+    @FunctionalInterface
+    public interface DoThing {
+        void doThing() throws Exception;
     }
     
     /*
@@ -80,11 +121,30 @@ public class Transform {
      */
     public static String formatDuration(Duration duration) {
         long nanos = duration.toNanos();
-    
+        
         TimeUnit unit = chooseUnit(nanos);
         double value = (double) nanos / NANOSECONDS.convert(1, unit);
-    
+        
         return formatCompact4Digits(value) + " " + abbreviate(unit);
+    }
+    
+    private static void copyDirectory(Path src, Path dest) throws IOException {
+        if (Files.exists(dest)) {
+            try (Stream<Path> walk = Files.walk(dest)) {
+                walk.sorted(Comparator.reverseOrder())
+                        .map(Path::toFile)
+                        .forEach(File::delete);
+            }
+        }
+        try (Stream<Path> stream = Files.walk(src)) {
+            stream.forEachOrdered(sourcePath -> {
+                try {
+                    Files.copy(sourcePath, dest.resolve(src.relativize(sourcePath)));
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        }
     }
     
     private static String formatCompact4Digits(double value) {
@@ -141,7 +201,30 @@ public class Transform {
             throw new FileNotFoundException(input.toString());
         }
         
-        if (input.toFile().getAbsolutePath().endsWith(".class")) {
+        if (input.toFile().isDirectory()) {
+            try (ZipOutputStream zipOutputStream = new ZipOutputStream(Files.newOutputStream(output))) {
+                ClassAdder adder = (className, bytes) -> {
+                    zipOutputStream.putNextEntry(new ZipEntry(className + ".class"));
+                    zipOutputStream.write(bytes);
+                    zipOutputStream.closeEntry();
+                };
+                
+                for (Path path : Files.walk(input).toArray(Path[]::new)) {
+                    byte[] allBytes = Files.readAllBytes(input);
+                    ClassReader reader = new ClassReader(allBytes);
+                    if ((reader.getAccess() & Opcodes.ACC_MODULE) == 0) {
+                        ClassNode node = new ClassNode(Opcodes.ASM8);
+                        reader.accept(node, ClassReader.EXPAND_FRAMES);
+                        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+                        transformer.transform(node, adder).accept(writer);
+                        allBytes = writer.toByteArray();
+                    }
+                    zipOutputStream.putNextEntry(new ZipEntry(path.relativize(input).toString()));
+                    zipOutputStream.write(allBytes);
+                    zipOutputStream.closeEntry();
+                }
+            }
+        } else if (input.toFile().getAbsolutePath().endsWith(".class")) {
             byte[] allBytes = Files.readAllBytes(input);
             ClassReader reader = new ClassReader(allBytes);
             if ((reader.getAccess() & Opcodes.ACC_MODULE) == 0) {

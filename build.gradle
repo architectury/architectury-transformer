@@ -26,6 +26,17 @@ repositories {
     gradlePluginPortal()
 }
 
+sourceSets {
+    agent
+    runtime {
+        compileClasspath += sourceSets.main.runtimeClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath
+        compileClasspath += sourceSets.agent.runtimeClasspath
+        runtimeClasspath += sourceSets.agent.runtimeClasspath
+    }
+    annotationsInject
+}
+
 dependencies {
     implementation "net.fabricmc:tiny-remapper:0.3.0.70"
     implementation "net.fabricmc:tiny-mappings-parser:0.2.2.14"
@@ -33,13 +44,55 @@ dependencies {
     implementation "org.ow2.asm:asm-commons:8.0"
     implementation "org.ow2.asm:asm-tree:8.0"
     implementation "org.ow2.asm:asm-util:8.0"
+    implementation "com.google.guava:guava:29.0-jre"
     implementation "org.zeroturnaround:zt-zip:1.13"
     implementation "com.google.code.gson:gson:2.8.5"
 }
 
+task annotationsInjectJar(type: Jar) {
+    classifier = 'annotations-inject'
+    from sourceSets.annotationsInject.output
+}
+
 task sourcesJar(type: Jar, dependsOn: classes) {
-    classifier("sources")
+    classifier "sources"
     from sourceSets.main.allSource
+}
+
+task agentJar(type: Jar) {
+    classifier "agent"
+    manifest {
+        attributes(
+                "Premain-Class": "me.shedaniel.architectury.transformer.agent.TransformerAgent",
+                "Agent-Class": "me.shedaniel.architectury.transformer.agent.TransformerAgent",
+                "Can-Redefine-Classes": true,
+                "Can-Retransform-Classes": true
+        )
+    }
+    from sourceSets.agent.output
+}
+
+task runtimeJar(type: Jar, dependsOn: shadowJar) {
+    classifier "runtime"
+    manifest {
+        attributes "Main-Class": "me.shedaniel.architectury.transformer.TransformerRuntime"
+    }
+    from {
+        sourceSets.runtime.output + zipTree(shadowJar.archiveFile)
+    }
+    from(annotationsInjectJar.outputs) {
+        into "annotations-inject"
+        rename { "injection.jar" }
+    }
+    from(agentJar.outputs) {
+        into "agent"
+        rename { "injection.jar" }
+    }
+}
+
+task runtimeSourcesJar(type: Jar, dependsOn: classes) {
+    classifier "runtime-sources"
+    from sourceSets.runtime.allSource
 }
 
 jar {
@@ -57,12 +110,17 @@ shadowJar {
 }
 
 build.dependsOn shadowJar
+build.dependsOn runtimeJar
 
 publishing {
     publications {
-        MyPublication(MavenPublication) {
+        main(MavenPublication) {
             artifact(shadowJar)
             artifact(sourcesJar)
+        }
+        runtime(MavenPublication) {
+            artifact(runtimeJar)
+            artifact(runtimeSourcesJar)
         }
     }
 

@@ -1,12 +1,12 @@
 package me.shedaniel.architectury.transformer.transformers;
 
 import com.google.gson.*;
-import me.shedaniel.architectury.transformer.Transformer;
-import me.shedaniel.architectury.transformer.TransformerStepSkipped;
+import me.shedaniel.architectury.transformer.transformers.base.AssetEditTransformer;
+import me.shedaniel.architectury.transformer.transformers.base.edit.AssetEditSink;
+import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
 import net.fabricmc.mapping.tree.ClassDef;
 import net.fabricmc.mapping.tree.TinyMappingFactory;
 import net.fabricmc.mapping.tree.TinyTree;
-import org.zeroturnaround.zip.ZipUtil;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -18,78 +18,76 @@ import java.util.function.UnaryOperator;
 import java.util.jar.Manifest;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
 
 /**
  * Adds mixins to the MixinConfigs field in the manifest, and remap intermediary refmap to srg.
  */
-public class FixForgeMixin implements Transformer {
+public class FixForgeMixin implements AssetEditTransformer {
     @Override
-    public void transform(Path input, Path output) throws Throwable {
-        Files.copy(input, output);
-        fixMixins(output.toFile());
-    }
-    
-    private void fixMixins(File output) throws TransformerStepSkipped {
+    public void doEdit(TransformerContext context, AssetEditSink sink) throws Exception {
         Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
         List<String> mixinConfigs = new ArrayList<>();
         String refmap = System.getProperty(BuiltinProperties.REFMAP_NAME);
-        ZipUtil.iterate(output, (stream, entry) -> {
-            if (!entry.isDirectory() && entry.getName().endsWith(".json") &&
-                !entry.getName().contains("/") && !entry.getName().contains("\\")
-            ) {
-                try (InputStreamReader reader = new InputStreamReader(stream)) {
+        sink.handle((path, bytes) -> {
+            if (path.endsWith(".json") && !path.contains("/") && !path.contains("\\")) {
+                try (InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(bytes))) {
                     JsonObject json = gson.fromJson(reader, JsonObject.class);
                     if (json != null) {
                         boolean hasMixins = json.has("mixins") && json.get("mixins").isJsonArray();
                         boolean hasClient = json.has("client") && json.get("client").isJsonArray();
                         boolean hasServer = json.has("server") && json.get("server").isJsonArray();
                         if (json.has("package") && (hasMixins || hasClient || hasServer)) {
-                            mixinConfigs.add(entry.getName());
+                            mixinConfigs.add(path);
                         }
                     }
                 } catch (Exception ignored) {
                 }
             }
         });
-        if (mixinConfigs.size() > 0) {
-            if (ZipUtil.containsEntry(output, "META-INF/MANIFEST.MF")) {
-                ZipUtil.transformEntry(output, "META-INF/MANIFEST.MF", (input, zipEntry, out) -> {
-                    Manifest manifest = new Manifest(input);
+        if (context.canModifyAssets()) {
+            sink.transformFile("META-INF/MANIFEST.MF", bytes -> {
+                try {
+                    Manifest manifest = new Manifest(new ByteArrayInputStream(bytes));
                     manifest.getMainAttributes().putValue("MixinConfigs", String.join(",", mixinConfigs));
-                    out.putNextEntry(new ZipEntry(zipEntry.getName()));
-                    manifest.write(out);
-                    out.closeEntry();
-                });
-            }
-        }
-        if (refmap != null && ZipUtil.containsEntry(output, refmap)) {
-            ZipUtil.transformEntry(output, "META-INF/MANIFEST.MF", (input, zipEntry, out) -> {
-                JsonObject refmapElement = new JsonParser().parse(new InputStreamReader(input)).getAsJsonObject().deepCopy();
-                if (refmapElement.has("mappings")) {
-                    for (Map.Entry<String, JsonElement> entry : refmapElement.get("mappings").getAsJsonObject().entrySet()) {
-                        remapRefmap(entry.getValue().getAsJsonObject());
-                    }
+                    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                    manifest.write(stream);
+                    return stream.toByteArray();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
                 }
-                if (refmapElement.has("data")) {
-                    JsonObject data = refmapElement.get("data").getAsJsonObject();
-                    if (data.has("named:intermediary")) {
-                        JsonObject copy = data.get("named:intermediary").getAsJsonObject().deepCopy();
-                        for (Map.Entry<String, JsonElement> entry : copy.get("mappings").getAsJsonObject().entrySet()) {
+            });
+        } else if (context.canAppendArgument()) {
+            for (String config : mixinConfigs) {
+                context.appendArgument("--mixin.config", config);
+            }
+        } else {
+            System.err.println("Failed to inject mixin config!");
+        }
+        if (refmap != null) {
+            sink.dangerouslyTransformFile(refmap, bytes -> {
+                try {
+                    JsonObject refmapElement = new JsonParser().parse(new InputStreamReader(new ByteArrayInputStream(bytes))).getAsJsonObject().deepCopy();
+                    if (refmapElement.has("mappings")) {
+                        for (Map.Entry<String, JsonElement> entry : refmapElement.get("mappings").getAsJsonObject().entrySet()) {
                             remapRefmap(entry.getValue().getAsJsonObject());
                         }
-                        data.add("searge", copy);
-                        data.remove("named:intermediary");
                     }
+                    if (refmapElement.has("data")) {
+                        JsonObject data = refmapElement.get("data").getAsJsonObject();
+                        if (data.has("named:intermediary")) {
+                            JsonObject copy = data.get("named:intermediary").getAsJsonObject().deepCopy();
+                            for (Map.Entry<String, JsonElement> entry : copy.get("mappings").getAsJsonObject().entrySet()) {
+                                remapRefmap(entry.getValue().getAsJsonObject());
+                            }
+                            data.add("searge", copy);
+                            data.remove("named:intermediary");
+                        }
+                    }
+                    return gson.toJson(refmapElement).getBytes(StandardCharsets.UTF_8);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
                 }
-                out.putNextEntry(new ZipEntry(zipEntry.getName()));
-                out.write(gson.toJson(refmapElement).getBytes(StandardCharsets.UTF_8));
-                out.closeEntry();
             });
-        } else {
-            if (mixinConfigs.isEmpty()) {
-                throw TransformerStepSkipped.INSTANCE;
-            }
         }
     }
     

@@ -1,10 +1,10 @@
 package me.shedaniel.architectury.transformer.transformers;
 
-import me.shedaniel.architectury.transformer.Transformer;
-import me.shedaniel.architectury.transformer.util.LoggerFilter;
+import me.shedaniel.architectury.transformer.transformers.base.TinyRemapperTransformer;
 import net.fabricmc.mapping.tree.TinyMappingFactory;
 import net.fabricmc.mapping.tree.TinyTree;
-import net.fabricmc.tinyremapper.*;
+import net.fabricmc.tinyremapper.IMappingProvider;
+import net.fabricmc.tinyremapper.TinyUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -12,35 +12,16 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
-import java.util.stream.Stream;
 
-public class TransformForgeEnvironment implements Transformer {
+public class TransformForgeEnvironment implements TinyRemapperTransformer {
     @Override
-    public void transform(Path input, Path output) throws Throwable {
-        TinyRemapper.Builder builder = TinyRemapper.newRemapper()
-                .withMappings(remapEnvironment())
-                .skipLocalVariableMapping(true);
-        
-        mapMixin(builder);
-        
-        Path[] classpath = Stream.of(RemapInjectables.getClasspath())
-                .map(Paths::get)
-                .toArray(Path[]::new);
-        
-        TinyRemapper remapper = builder.build();
-        LoggerFilter.replaceSystemOut();
-        
-        try (OutputConsumerPath outputConsumer = new OutputConsumerPath.Builder(output).build()) {
-            outputConsumer.addNonClassFiles(input, NonClassCopyMode.FIX_META_INF, null);
-            remapper.readClassPath(classpath);
-            remapper.readInputs(input);
-            remapper.apply(outputConsumer);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to remap " + input + " to " + output, e);
-        } finally {
-            remapper.finish();
-        }
+    public List<IMappingProvider> collectMappings() throws Exception {
+        List<IMappingProvider> providers = mapMixin();
+        providers.add(remapEnvironment());
+        return providers;
     }
     
     private IMappingProvider remapEnvironment() {
@@ -54,7 +35,8 @@ public class TransformForgeEnvironment implements Transformer {
         };
     }
     
-    private void mapMixin(TinyRemapper.Builder remapperBuilder) throws IOException {
+    private List<IMappingProvider> mapMixin() throws IOException {
+        List<IMappingProvider> providers = new ArrayList<>();
         Path srgMappingsPath = Paths.get(System.getProperty(BuiltinProperties.MAPPINGS_WITH_SRG));
         TinyTree srg;
         try (BufferedReader reader = Files.newBufferedReader(srgMappingsPath)) {
@@ -64,7 +46,7 @@ public class TransformForgeEnvironment implements Transformer {
         for (String path : BuiltinProperties.MIXIN_MAPPINGS.split(File.pathSeparator)) {
             File mixinMapFile = Paths.get(path).toFile();
             if (mixinMapFile.exists()) {
-                remapperBuilder.withMappings(sink -> {
+                providers.add(sink -> {
                     TinyUtils.createTinyMappingProvider(mixinMapFile.toPath(), "named", "intermediary").load(new IMappingProvider.MappingAcceptor() {
                         @Override
                         public void acceptClass(String srcName, String dstName) {
@@ -118,5 +100,7 @@ public class TransformForgeEnvironment implements Transformer {
                 });
             }
         }
+        
+        return providers;
     }
 }
