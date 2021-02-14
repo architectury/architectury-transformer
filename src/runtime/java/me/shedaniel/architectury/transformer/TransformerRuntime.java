@@ -134,8 +134,9 @@ public class TransformerRuntime {
             populateAddUrl().accept(tmpJar.toUri().toURL());
             
             new PathModifyListener(entry.getKey(), path -> {
-                System.out.println("[Architectury Transformer Runtime] Detected File Modification at " + path.getFileName().toString());
                 try (JarOutputInterface outputInterface = new JarOutputInterface(tmpJar)) {
+                    Thread.sleep(4000);
+                    System.out.println("[Architectury Transformer Runtime] Detected File Modification at " + path.getFileName().toString());
                     try (JarInputInterface inputInterface = new JarInputInterface(entry.getKey())) {
                         Transform.runTransformers(new TransformerContext() {
                             @Override
