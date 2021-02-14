@@ -17,18 +17,7 @@ import java.util.*;
 public class TransformForgeEnvironment implements TinyRemapperTransformer {
     private TinyTree srg;
     private Map<String, IMappingProvider> mixinMappingCache = new HashMap<>();
-    
-    public TransformForgeEnvironment() {
-        try {
-            Path srgMappingsPath = Paths.get(System.getProperty(BuiltinProperties.MAPPINGS_WITH_SRG));
-            try (BufferedReader reader = Files.newBufferedReader(srgMappingsPath)) {
-                srg = TinyMappingFactory.loadWithDetection(reader);
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-    
+
     @Override
     public List<IMappingProvider> collectMappings() throws Exception {
         List<IMappingProvider> providers = mapMixin();
@@ -49,7 +38,14 @@ public class TransformForgeEnvironment implements TinyRemapperTransformer {
     
     private List<IMappingProvider> mapMixin() throws IOException {
         List<IMappingProvider> providers = new ArrayList<>();
-        
+
+        if (srg == null) {
+            Path srgMappingsPath = Paths.get(System.getProperty(BuiltinProperties.MAPPINGS_WITH_SRG));
+            try (BufferedReader reader = Files.newBufferedReader(srgMappingsPath)) {
+                srg = TinyMappingFactory.loadWithDetection(reader);
+            }
+        }
+
         for (String path : BuiltinProperties.MIXIN_MAPPINGS.split(File.pathSeparator)) {
             File mixinMapFile = Paths.get(path).toFile();
             if (mixinMapFile.exists()) {
