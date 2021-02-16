@@ -13,9 +13,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.instrument.ClassFileTransformer;
-import java.lang.instrument.IllegalClassFormatException;
-import java.lang.instrument.Instrumentation;
+import java.lang.instrument.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -101,17 +99,17 @@ public class TransformerRuntime {
                             argsList.addAll(Arrays.asList(args));
                             System.out.println("[Architectury Transformer Runtime] Appended Launch Argument: " + Arrays.toString(args));
                         }
-        
+                        
                         @Override
                         public boolean canModifyAssets() {
                             return false;
                         }
-        
+                        
                         @Override
                         public boolean canAppendArgument() {
                             return true;
                         }
-    
+                        
                         @Override
                         public boolean canAddClasses() {
                             return true;
@@ -121,15 +119,15 @@ public class TransformerRuntime {
                         public void addFile(String path, byte[] bytes) throws IOException {
                             outputInterface.addFile(stripLeadingSlash.apply(path), bytes);
                         }
-        
+                        
                         @Override
                         public void modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
                             outputInterface.modifyFile(stripLeadingSlash.apply(path), action);
                         }
-        
+                        
                         @Override
                         public void close() throws IOException {
-            
+                            
                         }
                     }, entry.getValue());
                 }
@@ -142,22 +140,23 @@ public class TransformerRuntime {
                 try (JarOutputInterface outputInterface = new JarOutputInterface(tmpJar)) {
                     Thread.sleep(4000);
                     System.out.println("[Architectury Transformer Runtime] Detected File Modification at " + path.getFileName().toString());
+                    Map<String, byte[]> redefine = new HashMap<>();
                     try (JarInputInterface inputInterface = new JarInputInterface(entry.getKey())) {
                         Transform.runTransformers(new TransformerContext() {
                             @Override
                             public void appendArgument(String... args) {
                             }
-        
+                            
                             @Override
                             public boolean canModifyAssets() {
                                 return true;
                             }
-        
+                            
                             @Override
                             public boolean canAppendArgument() {
                                 return false;
                             }
-    
+                            
                             @Override
                             public boolean canAddClasses() {
                                 return false;
@@ -165,22 +164,44 @@ public class TransformerRuntime {
                         }, inputInterface, new OutputInterface() {
                             @Override
                             public void addFile(String path, byte[] bytes) throws IOException {
-                                if (path.endsWith(".class")) return;
                                 outputInterface.addFile(stripLeadingSlash.apply(path), bytes);
+                                
+                                if (path.endsWith(".class")) {
+                                    String s = stripLeadingSlash.apply(path);
+                                    s = s.substring(0, s.length() - 6);
+                                    redefine.put(s, bytes);
+                                }
                             }
-        
+                            
                             @Override
                             public void modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
-                                if (path.endsWith(".class")) return;
                                 outputInterface.modifyFile(stripLeadingSlash.apply(path), action);
                             }
-        
+                            
                             @Override
                             public void close() throws IOException {
-            
+                                
                             }
                         }, entry.getValue());
                     }
+                    redefine.forEach((s, bytes) -> {
+                        try {
+                            if (TransformerAgent.getInstrumentation().isRedefineClassesSupported()) {
+                                String name = s.replace('/', '.');
+                                Iterator<Class> iterator = Arrays.stream(TransformerAgent.getInstrumentation().getAllLoadedClasses())
+                                        .filter(a -> a.getClassLoader() != ClassLoader.getSystemClassLoader())
+                                        .filter(a -> Objects.equals(a.getName(), name))
+                                        .iterator();
+                                for (Iterator<Class> it = iterator; it.hasNext(); ) {
+                                    Class a = it.next();
+                                    System.out.println("[Architectury Transformer Runtime] Redefining " + s);
+                                    TransformerAgent.getInstrumentation().redefineClasses(new ClassDefinition(a, bytes));
+                                }
+                            }
+                        } catch (ClassNotFoundException | UnmodifiableClassException e) {
+                            e.printStackTrace();
+                        }
+                    });
                 } catch (Exception exception) {
                     exception.printStackTrace();
                 }
@@ -216,7 +237,7 @@ public class TransformerRuntime {
                 public boolean canAppendArgument() {
                     return true;
                 }
-    
+                
                 @Override
                 public boolean canAddClasses() {
                     return false;
