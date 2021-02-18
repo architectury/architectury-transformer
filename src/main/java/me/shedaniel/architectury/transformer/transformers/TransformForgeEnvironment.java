@@ -1,6 +1,7 @@
 package me.shedaniel.architectury.transformer.transformers;
 
 import me.shedaniel.architectury.transformer.transformers.base.TinyRemapperTransformer;
+import me.shedaniel.architectury.transformer.util.Logger;
 import net.fabricmc.mapping.tree.TinyMappingFactory;
 import net.fabricmc.mapping.tree.TinyTree;
 import net.fabricmc.tinyremapper.IMappingProvider;
@@ -53,45 +54,45 @@ public class TransformForgeEnvironment implements TinyRemapperTransformer {
         for (String path : System.getProperty(BuiltinProperties.MIXIN_MAPPINGS).split(File.pathSeparator)) {
             File mixinMapFile = Paths.get(path).toFile();
             if (mixinMapFile.exists()) {
+                Logger.debug("Reading mixin mappings file: " + mixinMapFile.getAbsolutePath());
                 providers.add(mixinMappingCache.computeIfAbsent(path, p -> sink -> {
                     TinyUtils.createTinyMappingProvider(mixinMapFile.toPath(), "named", "intermediary").load(new IMappingProvider.MappingAcceptor() {
                         @Override
                         public void acceptClass(String srcName, String dstName) {
-                            sink.acceptClass(dstName, srg.getClasses()
+                            String srgName = srg.getClasses()
                                     .stream()
                                     .filter(it -> Objects.equals(it.getName("intermediary"), dstName))
                                     .findFirst()
                                     .map(it -> it.getName("srg"))
-                                    .orElse(dstName)
-                            );
+                                    .orElse(dstName);
+                            sink.acceptClass(srcName, srgName);
+                            Logger.debug("Remap mixin class %s -> %s", srcName, srgName);
                         }
                         
                         @Override
                         public void acceptMethod(IMappingProvider.Member method, String dstName) {
-                            sink.acceptMethod(
-                                    new IMappingProvider.Member(method.owner, dstName, method.desc),
-                                    srg.getClasses()
-                                            .stream()
-                                            .flatMap(it -> it.getMethods().stream())
-                                            .filter(it -> Objects.equals(it.getName("intermediary"), dstName))
-                                            .findFirst()
-                                            .map(it -> it.getName("srg"))
-                                            .orElse(dstName)
-                            );
+                            String srgName = srg.getClasses()
+                                    .stream()
+                                    .flatMap(it -> it.getMethods().stream())
+                                    .filter(it -> Objects.equals(it.getName("intermediary"), dstName))
+                                    .findFirst()
+                                    .map(it -> it.getName("srg"))
+                                    .orElse(dstName);
+                            sink.acceptMethod(method, srgName);
+                            Logger.debug("Remap mixin method %s#%s%s -> %s", method.owner, method.name, method.desc, srgName);
                         }
                         
                         @Override
                         public void acceptField(IMappingProvider.Member field, String dstName) {
-                            sink.acceptField(
-                                    new IMappingProvider.Member(field.owner, dstName, field.desc),
-                                    srg.getClasses()
-                                            .stream()
-                                            .flatMap(it -> it.getFields().stream())
-                                            .filter(it -> Objects.equals(it.getName("intermediary"), dstName))
-                                            .findFirst()
-                                            .map(it -> it.getName("srg"))
-                                            .orElse(dstName)
-                            );
+                            String srgName = srg.getClasses()
+                                    .stream()
+                                    .flatMap(it -> it.getFields().stream())
+                                    .filter(it -> Objects.equals(it.getName("intermediary"), dstName))
+                                    .findFirst()
+                                    .map(it -> it.getName("srg"))
+                                    .orElse(dstName);
+                            sink.acceptField(field, srgName);
+                            Logger.debug("Remap mixin field %s#%s:%s -> %s", field.owner, field.name, field.desc, srgName);
                         }
                         
                         @Override

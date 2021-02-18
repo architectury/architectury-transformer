@@ -75,18 +75,10 @@ public class SimpleTransformerHandler implements TransformHandler {
                     classTransformer[0] = path -> node -> ((ClassEditTransformer) transformer).doEdit(path, tmp[0].apply(path).apply(node));
                 }
             }
-            if (transformer instanceof AssetEditTransformer) {
-                try {
-                    ((AssetEditTransformer) transformer).doEdit(context, assetEdit);
-                } catch (Exception exception) {
-                    exception.printStackTrace();
-                }
-            }
             if (transformer instanceof TinyRemapperTransformer) {
                 mappingProviders.addAll(((TinyRemapperTransformer) transformer).collectMappings());
             }
         }
-        
         
         if (mappingProviders.size() > 0) {
             Logger.debug("Remapping with " + mappingProviders.size() + " mapping provider(s):");
@@ -116,6 +108,16 @@ public class SimpleTransformerHandler implements TransformHandler {
                     }
                 }
             });
+        }
+        
+        for (Transformer transformer : transformers) {
+            if (transformer instanceof AssetEditTransformer) {
+                try {
+                    ((AssetEditTransformer) transformer).doEdit(context, assetEdit);
+                } catch (Exception exception) {
+                    exception.printStackTrace();
+                }
+            }
         }
     }
     
@@ -167,8 +169,10 @@ public class SimpleTransformerHandler implements TransformHandler {
         try (JarOutputInterface outputInterface = new JarOutputInterface(tmpJar)) {
             input.handle((path, bytes) -> {
                 try {
-                    Logger.debug("Remapping input file: " + path);
-                    outputInterface.addFile(path, bytes);
+                    if (path.endsWith(".class")) {
+                        Logger.debug("Remapping input file: " + path);
+                        outputInterface.addFile(path, bytes);
+                    }
                 } catch (IOException exception) {
                     throw new UncheckedIOException(exception);
                 }
