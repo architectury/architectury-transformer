@@ -15,8 +15,6 @@ public interface AssetEditSink {
      */
     void transformFile(String path, UnaryOperator<byte[]> transformer) throws IOException;
     
-    void dangerouslyTransformFile(String path, UnaryOperator<byte[]> transformer) throws IOException;
-    
     default void addFile(String path, String text) throws IOException {
         addFile(path, text.getBytes(StandardCharsets.UTF_8));
     }

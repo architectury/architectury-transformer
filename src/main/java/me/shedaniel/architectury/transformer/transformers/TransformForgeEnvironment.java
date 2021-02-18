@@ -9,6 +9,7 @@ import net.fabricmc.tinyremapper.TinyUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -17,7 +18,7 @@ import java.util.*;
 public class TransformForgeEnvironment implements TinyRemapperTransformer {
     private TinyTree srg;
     private Map<String, IMappingProvider> mixinMappingCache = new HashMap<>();
-
+    
     @Override
     public List<IMappingProvider> collectMappings() throws Exception {
         List<IMappingProvider> providers = mapMixin();
@@ -26,11 +27,14 @@ public class TransformForgeEnvironment implements TinyRemapperTransformer {
     }
     
     private IMappingProvider remapEnvironment() {
-        return out -> {
-            out.acceptClass("net/fabricmc/api/Environment", "net/minecraftforge/api/distmarker/OnlyIn");
-            out.acceptClass("net/fabricmc/api/EnvType", "net/minecraftforge/api/distmarker/Dist");
-            out.acceptField(
-                    new IMappingProvider.Member("net/fabricmc/api/EnvType", "SERVER", "Lnet/fabricmc/api/EnvType;"),
+        return sink -> {
+            // Stop shadow plugin from relocating this
+            // net/fabricmc/api
+            String fabricLoaderApiPackage = new String(new byte[]{0x6e, 0x65, 0x74, 0x2f, 0x66, 0x61, 0x62, 0x72, 0x69, 0x63, 0x6d, 0x63, 0x2f, 0x61, 0x70, 0x69}, StandardCharsets.UTF_8);
+            sink.acceptClass(fabricLoaderApiPackage + "/Environment", "net/minecraftforge/api/distmarker/OnlyIn");
+            sink.acceptClass(fabricLoaderApiPackage + "/EnvType", "net/minecraftforge/api/distmarker/Dist");
+            sink.acceptField(
+                    new IMappingProvider.Member(fabricLoaderApiPackage + "/EnvType", "SERVER", "L" + fabricLoaderApiPackage + "/EnvType" + ";"),
                     "DEDICATED_SERVER"
             );
         };
@@ -38,15 +42,15 @@ public class TransformForgeEnvironment implements TinyRemapperTransformer {
     
     private List<IMappingProvider> mapMixin() throws IOException {
         List<IMappingProvider> providers = new ArrayList<>();
-
+        
         if (srg == null) {
             Path srgMappingsPath = Paths.get(System.getProperty(BuiltinProperties.MAPPINGS_WITH_SRG));
             try (BufferedReader reader = Files.newBufferedReader(srgMappingsPath)) {
                 srg = TinyMappingFactory.loadWithDetection(reader);
             }
         }
-
-        for (String path : BuiltinProperties.MIXIN_MAPPINGS.split(File.pathSeparator)) {
+        
+        for (String path : System.getProperty(BuiltinProperties.MIXIN_MAPPINGS).split(File.pathSeparator)) {
             File mixinMapFile = Paths.get(path).toFile();
             if (mixinMapFile.exists()) {
                 providers.add(mixinMappingCache.computeIfAbsent(path, p -> sink -> {

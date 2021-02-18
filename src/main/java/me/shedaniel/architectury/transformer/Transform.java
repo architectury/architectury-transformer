@@ -1,15 +1,17 @@
 package me.shedaniel.architectury.transformer;
 
 import me.shedaniel.architectury.transformer.handler.SimpleTransformerHandler;
-import me.shedaniel.architectury.transformer.handler.TinyRemapperPreparedTransformerHandler;
 import me.shedaniel.architectury.transformer.input.*;
 import me.shedaniel.architectury.transformer.transformers.BuiltinProperties;
+import me.shedaniel.architectury.transformer.transformers.ClasspathProvider;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
+import me.shedaniel.architectury.transformer.util.Logger;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.zeroturnaround.zip.commons.IOUtils;
+import sun.rmi.runtime.Log;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -23,6 +25,7 @@ import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -61,32 +64,39 @@ public class Transform {
             public boolean canAppendArgument() {
                 return false;
             }
-    
+            
             @Override
             public boolean canAddClasses() {
                 return true;
             }
         };
+        ClasspathProvider classpath = ClasspathProvider.fromProperties().filter(path -> {
+            return !Objects.equals(input.toFile().getAbsoluteFile(), path.toFile().getAbsoluteFile());
+        });
+        Logger.debug("Transforming " + transformers.size() + " transformer(s) from " + input.toString() + " to " + output.toString() + ": ");
+        for (Transformer transformer : transformers) {
+            Logger.debug(" - " + transformer.toString());
+        }
         logTime(() -> {
             if (Files.isDirectory(input)) {
                 copyDirectory(input, output);
                 try (DirectoryInputInterface inputInterface = new DirectoryInputInterface(input);
                      DirectoryOutputInterface outputInterface = new DirectoryOutputInterface(output)) {
-                    runTransformers(context, inputInterface, outputInterface, transformers);
+                    runTransformers(context, classpath, inputInterface, outputInterface, transformers);
                 }
             } else {
                 Files.copy(input, output, StandardCopyOption.REPLACE_EXISTING);
                 try (JarInputInterface inputInterface = new JarInputInterface(input);
                      JarOutputInterface outputInterface = new JarOutputInterface(output)) {
-                    runTransformers(context, inputInterface, outputInterface, transformers);
+                    runTransformers(context, classpath, inputInterface, outputInterface, transformers);
                 }
             }
         }, "Transformed jar with " + transformers.size() + " transformer(s)");
     }
     
-    public static void runTransformers(TransformerContext context, InputInterface input, OutputInterface output, List<Transformer> transformers)
+    public static void runTransformers(TransformerContext context, ClasspathProvider classpath, InputInterface input, OutputInterface output, List<Transformer> transformers)
             throws Exception {
-        try (SimpleTransformerHandler handler = new SimpleTransformerHandler(context)) {
+        try (SimpleTransformerHandler handler = new SimpleTransformerHandler(classpath, context)) {
             handler.handle(input, output, transformers);
         }
     }
@@ -94,7 +104,7 @@ public class Transform {
     
     public static void logTime(DoThing doThing, String task) throws Exception {
         measureTime(doThing, (duration) -> {
-            System.out.println(task + " in " + formatDuration(duration));
+            Logger.info(task + " in " + formatDuration(duration));
         });
     }
     
@@ -104,6 +114,15 @@ public class Transform {
         long finished = System.nanoTime();
         Duration duration = Duration.ofNanos(finished - current);
         measured.accept(duration);
+    }
+    
+    public static String stripLoadingSlash(String string) {
+        if (string.startsWith(File.separator)) {
+            return string.substring(1);
+        } else if (string.startsWith("/")) {
+            return string.substring(1);
+        }
+        return string;
     }
     
     @FunctionalInterface

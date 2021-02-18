@@ -7,7 +7,9 @@ import me.shedaniel.architectury.transformer.input.InputInterface;
 import me.shedaniel.architectury.transformer.input.JarInputInterface;
 import me.shedaniel.architectury.transformer.input.JarOutputInterface;
 import me.shedaniel.architectury.transformer.input.OutputInterface;
+import me.shedaniel.architectury.transformer.transformers.ClasspathProvider;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
+import me.shedaniel.architectury.transformer.util.Logger;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -40,6 +42,7 @@ public class TransformerRuntime {
     public static final String RUNTIME_TRANSFORM_CONFIG = "architectury.runtime.transformer";
     public static final String MAIN_CLASS = "architectury.main.class";
     public static final String PROPERTIES = "architectury.properties";
+    public static final Set<File> TRANSFORM_FILES = new HashSet<>();
     public static final Map<String, List<Transformer>> CLASSES_TO_TRANSFORM = new HashMap<>();
     
     public static void main(String[] args) throws Throwable {
@@ -53,6 +56,7 @@ public class TransformerRuntime {
         Path configPath = Paths.get(System.getProperty(RUNTIME_TRANSFORM_CONFIG));
         String configText = new String(Files.readAllBytes(configPath), StandardCharsets.UTF_8);
         Map<Path, List<Transformer>> toTransform = Arrays.stream(configText.split(File.pathSeparator))
+                .filter(s -> !s.trim().isEmpty())
                 .map(s -> s.split("\\|"))
                 .collect(Collectors.groupingBy(s -> Paths.get(s[0]),
                         Collectors.mapping(s -> {
@@ -63,15 +67,9 @@ public class TransformerRuntime {
                             }
                         }, Collectors.toList())));
         
-        UnaryOperator<String> stripLeadingSlash = s -> {
-            if (s.startsWith(File.separator)) {
-                return s.substring(1);
-            } else if (s.startsWith("/")) {
-                return s.substring(1);
-            }
-            return s;
-        };
+        UnaryOperator<String> stripLeadingSlash = Transform::stripLoadingSlash;
         for (Map.Entry<Path, List<Transformer>> entry : toTransform.entrySet()) {
+            TRANSFORM_FILES.add(entry.getKey().toFile().getAbsoluteFile());
             if (Files.isDirectory(entry.getKey())) {
                 Files.walk(entry.getKey()).forEach(path -> {
                     CLASSES_TO_TRANSFORM.put(stripLeadingSlash.apply(entry.getKey().relativize(path).toString()), entry.getValue());
@@ -93,11 +91,15 @@ public class TransformerRuntime {
             Files.copy(entry.getKey(), tmpJar);
             try (JarOutputInterface outputInterface = new JarOutputInterface(tmpJar)) {
                 try (JarInputInterface inputInterface = new JarInputInterface(entry.getKey())) {
+                    Logger.debug("Transforming " + entry.getValue().size() + " transformer(s) from " + entry.getKey().toString() + " to " + tmpJar.toString() + ": ");
+                    for (Transformer transformer : entry.getValue()) {
+                        Logger.debug(" - " + transformer.toString());
+                    }
                     Transform.runTransformers(new TransformerContext() {
                         @Override
                         public void appendArgument(String... args) {
                             argsList.addAll(Arrays.asList(args));
-                            System.out.println("[Architectury Transformer Runtime] Appended Launch Argument: " + Arrays.toString(args));
+                            Logger.debug("Appended Launch Argument: " + Arrays.toString(args));
                         }
                         
                         @Override
@@ -114,7 +116,9 @@ public class TransformerRuntime {
                         public boolean canAddClasses() {
                             return true;
                         }
-                    }, inputInterface, new OutputInterface() {
+                    }, ClasspathProvider.fromProperties().filter(path -> {
+                        return !Objects.equals(entry.getKey().toFile().getAbsoluteFile(), path.toFile().getAbsoluteFile());
+                    }), inputInterface, new OutputInterface() {
                         @Override
                         public void addFile(String path, byte[] bytes) throws IOException {
                             outputInterface.addFile(stripLeadingSlash.apply(path), bytes);
@@ -139,9 +143,13 @@ public class TransformerRuntime {
             new PathModifyListener(entry.getKey(), path -> {
                 try (JarOutputInterface outputInterface = new JarOutputInterface(tmpJar)) {
                     Thread.sleep(4000);
-                    System.out.println("[Architectury Transformer Runtime] Detected File Modification at " + path.getFileName().toString());
+                    Logger.info("Detected File Modification at " + path.getFileName().toString());
                     Map<String, byte[]> redefine = new HashMap<>();
                     try (JarInputInterface inputInterface = new JarInputInterface(entry.getKey())) {
+                        Logger.debug("Transforming " + entry.getValue().size() + " transformer(s) from " + entry.getKey().toString() + " to " + tmpJar.toString() + ": ");
+                        for (Transformer transformer : entry.getValue()) {
+                            Logger.debug(" - " + transformer.toString());
+                        }
                         Transform.runTransformers(new TransformerContext() {
                             @Override
                             public void appendArgument(String... args) {
@@ -161,7 +169,9 @@ public class TransformerRuntime {
                             public boolean canAddClasses() {
                                 return false;
                             }
-                        }, inputInterface, new OutputInterface() {
+                        }, ClasspathProvider.fromProperties().filter(classpathPath -> {
+                            return !Objects.equals(entry.getKey().toFile().getAbsoluteFile(), classpathPath.toFile().getAbsoluteFile());
+                        }), inputInterface, new OutputInterface() {
                             @Override
                             public void addFile(String path, byte[] bytes) throws IOException {
                                 outputInterface.addFile(stripLeadingSlash.apply(path), bytes);
@@ -194,7 +204,7 @@ public class TransformerRuntime {
                                         .iterator();
                                 for (Iterator<Class> it = iterator; it.hasNext(); ) {
                                     Class a = it.next();
-                                    System.out.println("[Architectury Transformer Runtime] Redefining " + s);
+                                    Logger.info("Redefining " + s);
                                     TransformerAgent.getInstrumentation().redefineClasses(new ClassDefinition(a, bytes));
                                 }
                             }
@@ -223,7 +233,9 @@ public class TransformerRuntime {
     private static void doInstrumentationStuff() {
         TransformHandler handler;
         try {
-            handler = new TinyRemapperPreparedTransformerHandler(new TransformerContext() {
+            handler = new TinyRemapperPreparedTransformerHandler(ClasspathProvider.fromProperties().filter(path -> {
+                return !TRANSFORM_FILES.contains(path.toFile().getAbsoluteFile());
+            }), new TransformerContext() {
                 @Override
                 public void appendArgument(String... args) {
                 }
@@ -242,7 +254,7 @@ public class TransformerRuntime {
                 public boolean canAddClasses() {
                     return false;
                 }
-            });
+            }).asThreadLocked();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -288,7 +300,7 @@ public class TransformerRuntime {
                                 }
                             }, transformers);
                         }, duration -> {
-                            System.out.println("[Architectury Transformer Runtime] Transformed " + className + " in " + formatDuration(duration));
+                            Logger.debug("Transformed " + className + " in " + formatDuration(duration));
                         });
                     } catch (Exception e) {
                         e.printStackTrace();

@@ -1,16 +1,17 @@
 package me.shedaniel.architectury.transformer.handler;
 
-import me.shedaniel.architectury.transformer.Transform;
 import me.shedaniel.architectury.transformer.Transformer;
 import me.shedaniel.architectury.transformer.input.InputInterface;
 import me.shedaniel.architectury.transformer.input.JarInputInterface;
 import me.shedaniel.architectury.transformer.input.JarOutputInterface;
 import me.shedaniel.architectury.transformer.input.OutputInterface;
+import me.shedaniel.architectury.transformer.transformers.ClasspathProvider;
 import me.shedaniel.architectury.transformer.transformers.base.AssetEditTransformer;
 import me.shedaniel.architectury.transformer.transformers.base.ClassEditTransformer;
 import me.shedaniel.architectury.transformer.transformers.base.TinyRemapperTransformer;
 import me.shedaniel.architectury.transformer.transformers.base.edit.AssetEditSink;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
+import me.shedaniel.architectury.transformer.util.Logger;
 import me.shedaniel.architectury.transformer.util.LoggerFilter;
 import net.fabricmc.tinyremapper.IMappingProvider;
 import net.fabricmc.tinyremapper.NonClassCopyMode;
@@ -23,21 +24,23 @@ import org.objectweb.asm.tree.ClassNode;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
-import java.util.stream.Stream;
 
 public class SimpleTransformerHandler implements TransformHandler {
-    private TransformerContext context;
-    private boolean closed = false;
+    protected ClasspathProvider classpath;
+    protected TransformerContext context;
+    protected boolean closed = false;
     
-    public SimpleTransformerHandler(TransformerContext context) throws Exception {
+    public SimpleTransformerHandler(ClasspathProvider classpath, TransformerContext context) throws Exception {
+        this.classpath = classpath.logging();
         this.context = context;
     }
     
@@ -59,11 +62,6 @@ public class SimpleTransformerHandler implements TransformHandler {
             
             @Override
             public void transformFile(String path, UnaryOperator<byte[]> transformer) throws IOException {
-                dangerouslyTransformFile(path, transformer);
-            }
-            
-            @Override
-            public void dangerouslyTransformFile(String path, UnaryOperator<byte[]> transformer) throws IOException {
                 output.modifyFile(path, transformer);
             }
         };
@@ -89,7 +87,12 @@ public class SimpleTransformerHandler implements TransformHandler {
             }
         }
         
+        
         if (mappingProviders.size() > 0) {
+            Logger.debug("Remapping with " + mappingProviders.size() + " mapping provider(s):");
+            for (IMappingProvider provider : mappingProviders) {
+                Logger.debug(" - " + provider);
+            }
             remapTR(mappingProviders, input, output);
         }
         
@@ -128,6 +131,7 @@ public class SimpleTransformerHandler implements TransformHandler {
             outputConsumer.addNonClassFiles(inputTmp, NonClassCopyMode.UNCHANGED, null);
             remapper.readInputs(inputTmp);
             remapper.apply(outputConsumer);
+            debugRemapper(remapper);
         } catch (Exception e) {
             throw new RuntimeException("Failed to remap " + input + " to " + output, e);
         } finally {
@@ -148,12 +152,22 @@ public class SimpleTransformerHandler implements TransformHandler {
         }
     }
     
+    private void debugRemapper(TinyRemapper remapper) throws Exception {
+        Field classMapField = remapper.getClass().getDeclaredField("classMap");
+        classMapField.setAccessible(true);
+        Logger.debug("Remapping Classes:");
+        ((Map<String, String>) classMapField.get(remapper)).forEach((from, to) -> {
+            Logger.debug(from + " -> " + to);
+        });
+    }
+    
     private static Path fillTmpInput(InputInterface input) throws IOException {
         Path tmpJar = Files.createTempFile(null, ".jar");
         Files.deleteIfExists(tmpJar);
         try (JarOutputInterface outputInterface = new JarOutputInterface(tmpJar)) {
             input.handle((path, bytes) -> {
                 try {
+                    Logger.debug("Remapping input file: " + path);
                     outputInterface.addFile(path, bytes);
                 } catch (IOException exception) {
                     throw new UncheckedIOException(exception);
@@ -170,12 +184,7 @@ public class SimpleTransformerHandler implements TransformHandler {
         }
         TinyRemapper remapper = builder.build();
         
-        Path[] classpath = Stream.of(Transform.getClasspath())
-                .map(Paths::get)
-                .filter(Files::exists)
-                .toArray(Path[]::new);
-        
-        remapper.readClassPath(classpath);
+        remapper.readClassPath(classpath.provide());
         return remapper;
     }
     
@@ -186,6 +195,7 @@ public class SimpleTransformerHandler implements TransformHandler {
     @Override
     public void close() throws IOException {
         this.context = null;
+        this.classpath = null;
         this.closed = true;
     }
 }

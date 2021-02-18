@@ -1,5 +1,7 @@
 package me.shedaniel.architectury.transformer;
 
+import me.shedaniel.architectury.transformer.util.Logger;
+
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.Objects;
@@ -18,7 +20,7 @@ public class PathModifyListener extends Thread {
     @Override
     public void run() {
         try {
-            System.out.println("[Architectury Transformer Runtime] Listening at " + path);
+            Logger.info("Listening at " + path);
             WatchService watcher = path.getFileSystem().newWatchService();
             try (WatchService watchService = FileSystems.getDefault().newWatchService()) {
                 WatchKey watchKey = path.getParent().register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);

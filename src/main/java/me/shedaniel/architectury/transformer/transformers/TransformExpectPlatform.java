@@ -4,6 +4,7 @@ import me.shedaniel.architectury.transformer.transformers.base.AssetEditTransfor
 import me.shedaniel.architectury.transformer.transformers.base.ClassEditTransformer;
 import me.shedaniel.architectury.transformer.transformers.base.edit.AssetEditSink;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
+import me.shedaniel.architectury.transformer.util.Logger;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Handle;
@@ -76,7 +77,7 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
             
             if (platformMethodsClass != null) {
                 if ((method.access & Opcodes.ACC_STATIC) == 0) {
-                    System.err.println("@ExpectPlatform can only apply to static methods!");
+                    Logger.error("@ExpectPlatform can only apply to static methods!");
                 } else {
                     method.instructions.clear();
                     int endOfDesc = method.desc.lastIndexOf(')');
