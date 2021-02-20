@@ -98,7 +98,7 @@ public class JarOutputInterface extends ClosableChecker implements OutputInterfa
     }
     
     private FileSystem getFS() {
-        closeAndValidate();
+        validateCloseState();
         if (!shouldCloseFs && !fs.isOpen()) {
             try {
                 Map<String, String> env = new HashMap<>();

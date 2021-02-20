@@ -94,7 +94,7 @@ public class JarInputInterface extends ClosableChecker implements InputInterface
     }
     
     private FileSystem getFS() {
-        closeAndValidate();
+        validateCloseState();
         if (!shouldCloseFs && !fs.isOpen()) {
             try {
                 Map<String, String> env = new HashMap<>();
