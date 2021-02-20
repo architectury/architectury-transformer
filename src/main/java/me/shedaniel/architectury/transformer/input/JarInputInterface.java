@@ -1,5 +1,7 @@
 package me.shedaniel.architectury.transformer.input;
 
+import me.shedaniel.architectury.transformer.util.ClosableChecker;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -10,10 +12,10 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
-public class JarInputInterface implements InputInterface {
-    private final boolean shouldCloseFs;
+public class JarInputInterface extends ClosableChecker implements InputInterface {
     private final Path path;
-    private final FileSystem fs;
+    private boolean shouldCloseFs;
+    private FileSystem fs;
     private final Map<Path, byte[]> cache = new HashMap<>();
     
     public JarInputInterface(Path path) {
@@ -42,7 +44,8 @@ public class JarInputInterface implements InputInterface {
     
     @Override
     public void handle(BiConsumer<String, byte[]> action) throws IOException {
-        for (Path root : fs.getRootDirectories()) {
+        validateCloseState();
+        for (Path root : getFS().getRootDirectories()) {
             try (Stream<Path> stream = Files.walk(root)) {
                 stream.forEachOrdered(path -> {
                     if (Files.isDirectory(path)) return;
@@ -60,10 +63,32 @@ public class JarInputInterface implements InputInterface {
     
     @Override
     public void close() throws IOException {
+        closeAndValidate();
         if (shouldCloseFs) {
             fs.close();
         }
         cache.clear();
+    }
+    
+    private FileSystem getFS() {
+        closeAndValidate();
+        if (!shouldCloseFs && !fs.isOpen()) {
+            try {
+                Map<String, String> env = new HashMap<>();
+                env.put("create", String.valueOf(Files.notExists(path)));
+                URI uri = new URI("jar:" + path.toUri());
+                cache.clear();
+                fs = FileSystems.newFileSystem(uri, env);
+                shouldCloseFs = true;
+                return fs;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+        if (!fs.isOpen()) {
+            throw new ClosedFileSystemException();
+        }
+        return fs;
     }
     
     @Override

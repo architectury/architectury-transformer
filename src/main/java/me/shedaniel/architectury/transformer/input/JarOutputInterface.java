@@ -1,5 +1,7 @@
 package me.shedaniel.architectury.transformer.input;
 
+import me.shedaniel.architectury.transformer.util.ClosableChecker;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -8,10 +10,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.UnaryOperator;
 
-public class JarOutputInterface implements OutputInterface {
-    private final boolean shouldCloseFs;
+public class JarOutputInterface extends ClosableChecker implements OutputInterface {
     private final Path path;
-    private final FileSystem fs;
+    private boolean shouldCloseFs;
+    private FileSystem fs;
     
     public JarOutputInterface(Path path) {
         this.path = path;
@@ -39,7 +41,8 @@ public class JarOutputInterface implements OutputInterface {
     
     @Override
     public void addFile(String path, byte[] bytes) throws IOException {
-        Path p = fs.getPath(path);
+        validateCloseState();
+        Path p = getFS().getPath(path);
         Path parent = p.normalize().getParent();
         if (parent != null && !Files.exists(parent)) {
             Files.createDirectories(parent);
@@ -49,7 +52,8 @@ public class JarOutputInterface implements OutputInterface {
     
     @Override
     public void modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
-        Path fsPath = fs.getPath(path);
+        validateCloseState();
+        Path fsPath = getFS().getPath(path);
         
         if (Files.exists(fsPath)) {
             byte[] bytes = Files.readAllBytes(fsPath);
@@ -64,9 +68,30 @@ public class JarOutputInterface implements OutputInterface {
     
     @Override
     public void close() throws IOException {
+        closeAndValidate();
         if (shouldCloseFs) {
             fs.close();
         }
+    }
+    
+    private FileSystem getFS() {
+        closeAndValidate();
+        if (!shouldCloseFs && !fs.isOpen()) {
+            try {
+                Map<String, String> env = new HashMap<>();
+                env.put("create", String.valueOf(Files.notExists(path)));
+                URI uri = new URI("jar:" + path.toUri());
+                fs = FileSystems.newFileSystem(uri, env);
+                shouldCloseFs = true;
+                return fs;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+        if (!fs.isOpen()) {
+            throw new ClosedFileSystemException();
+        }
+        return fs;
     }
     
     @Override

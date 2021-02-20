@@ -1,5 +1,7 @@
 package me.shedaniel.architectury.transformer.input;
 
+import me.shedaniel.architectury.transformer.util.ClosableChecker;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -9,7 +11,7 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
-public class DirectoryInputInterface implements InputInterface {
+public class DirectoryInputInterface extends ClosableChecker implements InputInterface {
     private final Path root;
     private final Map<Path, byte[]> cache = new HashMap<>();
     
@@ -19,6 +21,7 @@ public class DirectoryInputInterface implements InputInterface {
     
     @Override
     public void handle(BiConsumer<String, byte[]> action) throws IOException {
+        validateCloseState();
         try (Stream<Path> stream = Files.walk(root)) {
             stream.forEachOrdered(path -> {
                 if (Files.isDirectory(path)) return;
@@ -35,6 +38,7 @@ public class DirectoryInputInterface implements InputInterface {
     
     @Override
     public void close() throws IOException {
+        closeAndValidate();
         cache.clear();
     }
     

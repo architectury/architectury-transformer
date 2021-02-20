@@ -1,12 +1,14 @@
 package me.shedaniel.architectury.transformer.input;
 
+import me.shedaniel.architectury.transformer.util.ClosableChecker;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.function.UnaryOperator;
 
-public class DirectoryOutputInterface implements OutputInterface {
+public class DirectoryOutputInterface extends ClosableChecker implements OutputInterface {
     private final Path root;
     
     public DirectoryOutputInterface(Path root) {
@@ -15,6 +17,7 @@ public class DirectoryOutputInterface implements OutputInterface {
     
     @Override
     public void addFile(String path, byte[] bytes) throws IOException {
+        validateCloseState();
         Path p = root.resolve(path);
         Path parent = p.normalize().getParent();
         if (parent != null && !Files.exists(parent)) {
@@ -25,6 +28,7 @@ public class DirectoryOutputInterface implements OutputInterface {
     
     @Override
     public void modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
+        validateCloseState();
         Path file = root.resolve(path);
         
         if (Files.exists(file)) {
@@ -40,7 +44,7 @@ public class DirectoryOutputInterface implements OutputInterface {
     
     @Override
     public void close() throws IOException {
-        
+        closeAndValidate();
     }
     
     @Override
