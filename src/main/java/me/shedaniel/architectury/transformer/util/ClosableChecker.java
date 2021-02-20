@@ -35,9 +35,6 @@ public abstract class ClosableChecker implements Closeable {
     }
     
     protected void closeAndValidate() {
-        if (closed) {
-            throw new IllegalStateException("Can't use this if this is closed already!");
-        }
         closed = true;
     }
 }
