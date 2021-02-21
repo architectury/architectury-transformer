@@ -181,7 +181,7 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
                 insnList.add(new VarInsnNode(Opcodes.DLOAD, index));
                 break;
             default:
-                throw new IllegalStateException("Invalid Type: $type");
+                throw new IllegalStateException("Invalid Type: " + type);
         }
     }
     

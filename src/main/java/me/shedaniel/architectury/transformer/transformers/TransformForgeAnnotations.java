@@ -69,7 +69,8 @@ public class TransformForgeAnnotations implements ClassEditTransformer {
                     node.signature = s + "Lnet/minecraftforge/eventbus/api/Event;";
                 }
                 // if @ForgeEventCancellable, add the cancellable annotation from forge
-                if (node.visibleAnnotations.stream().anyMatch(annotation -> Objects.equals(annotation.desc, FORGE_EVENT_CANCELLABLE))) {
+                if (node.visibleAnnotations.stream().anyMatch(annotation -> Objects.equals(annotation.desc, FORGE_EVENT_CANCELLABLE)) &&
+                    node.visibleAnnotations.stream().noneMatch(annotation -> Objects.equals(annotation.desc, CANCELABLE))) {
                     node.visibleAnnotations.add(new AnnotationNode(CANCELABLE));
                 }
             }
@@ -80,7 +81,7 @@ public class TransformForgeAnnotations implements ClassEditTransformer {
         {
             Collection<AnnotationNode> invisibleEnvironments;
             if (node.invisibleAnnotations != null) {
-                invisibleEnvironments = node.invisibleAnnotations.stream().filter(annotation -> Objects.equals(annotation.desc, "L${environmentClass};"))
+                invisibleEnvironments = node.invisibleAnnotations.stream().filter(annotation -> Objects.equals(annotation.desc, "L" + ENVIRONMENT + ";"))
                         .collect(Collectors.toList());
                 node.invisibleAnnotations.removeAll(invisibleEnvironments);
             } else {
@@ -95,7 +96,7 @@ public class TransformForgeAnnotations implements ClassEditTransformer {
             
             Collection<AnnotationNode> invisibleEnvironments;
             if (field.invisibleAnnotations != null) {
-                invisibleEnvironments = field.invisibleAnnotations.stream().filter(annotation -> Objects.equals(annotation.desc, "L${environmentClass};"))
+                invisibleEnvironments = field.invisibleAnnotations.stream().filter(annotation -> Objects.equals(annotation.desc, "L" + ENVIRONMENT + ";"))
                         .collect(Collectors.toList());
                 field.invisibleAnnotations.removeAll(invisibleEnvironments);
             } else {
@@ -110,7 +111,7 @@ public class TransformForgeAnnotations implements ClassEditTransformer {
             
             Collection<AnnotationNode> invisibleEnvironments;
             if (method.invisibleAnnotations != null) {
-                invisibleEnvironments = method.invisibleAnnotations.stream().filter(annotation -> Objects.equals(annotation.desc, "L${environmentClass};"))
+                invisibleEnvironments = method.invisibleAnnotations.stream().filter(annotation -> Objects.equals(annotation.desc, "L" + ENVIRONMENT + ";"))
                         .collect(Collectors.toList());
                 method.invisibleAnnotations.removeAll(invisibleEnvironments);
             } else {
