@@ -42,6 +42,7 @@ public class TransformForgeAnnotations implements ClassEditTransformer {
     public static final String CANCELABLE = "Lnet/minecraftforge/eventbus/api/Cancelable;";
     
     private static final String ENVIRONMENT = "net/fabricmc/api/Environment";
+    private static final String ONLY_IN = "net/minecraftforge/api/distmarker/OnlyIn";
     
     @Override
     public ClassNode doEdit(String name, ClassNode node) {
@@ -81,7 +82,8 @@ public class TransformForgeAnnotations implements ClassEditTransformer {
         {
             Collection<AnnotationNode> invisibleEnvironments;
             if (node.invisibleAnnotations != null) {
-                invisibleEnvironments = node.invisibleAnnotations.stream().filter(annotation -> Objects.equals(annotation.desc, "L" + ENVIRONMENT + ";"))
+                invisibleEnvironments = node.invisibleAnnotations.stream()
+                        .filter(annotation -> Objects.equals(annotation.desc, "L" + ENVIRONMENT + ";") || Objects.equals(annotation.desc, "L" + ONLY_IN + ";"))
                         .collect(Collectors.toList());
                 node.invisibleAnnotations.removeAll(invisibleEnvironments);
             } else {
@@ -96,7 +98,8 @@ public class TransformForgeAnnotations implements ClassEditTransformer {
             
             Collection<AnnotationNode> invisibleEnvironments;
             if (field.invisibleAnnotations != null) {
-                invisibleEnvironments = field.invisibleAnnotations.stream().filter(annotation -> Objects.equals(annotation.desc, "L" + ENVIRONMENT + ";"))
+                invisibleEnvironments = field.invisibleAnnotations.stream()
+                        .filter(annotation -> Objects.equals(annotation.desc, "L" + ENVIRONMENT + ";") || Objects.equals(annotation.desc, "L" + ONLY_IN + ";"))
                         .collect(Collectors.toList());
                 field.invisibleAnnotations.removeAll(invisibleEnvironments);
             } else {
@@ -111,7 +114,8 @@ public class TransformForgeAnnotations implements ClassEditTransformer {
             
             Collection<AnnotationNode> invisibleEnvironments;
             if (method.invisibleAnnotations != null) {
-                invisibleEnvironments = method.invisibleAnnotations.stream().filter(annotation -> Objects.equals(annotation.desc, "L" + ENVIRONMENT + ";"))
+                invisibleEnvironments = method.invisibleAnnotations.stream()
+                        .filter(annotation -> Objects.equals(annotation.desc, "L" + ENVIRONMENT + ";") || Objects.equals(annotation.desc, "L" + ONLY_IN + ";"))
                         .collect(Collectors.toList());
                 method.invisibleAnnotations.removeAll(invisibleEnvironments);
             } else {
