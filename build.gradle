@@ -89,12 +89,12 @@ task agentSourcesJar(type: Jar, dependsOn: classes) {
     from sourceSets.agent.allSource
 }
 
-
 task runtimeJar(type: Jar, dependsOn: shadowJar) {
     classifier "runtime"
     manifest {
         attributes(
-                "Main-Class": "me.shedaniel.architectury.transformer.TransformerRuntime"
+                "Main-Class": "me.shedaniel.architectury.transformer.TransformerRuntime",
+                "Implementation-Version": project.version
         )
     }
     from {

@@ -69,6 +69,7 @@ public class TransformerRuntime {
     public static final Map<String, List<Transformer>> CLASSES_TO_TRANSFORM = new HashMap<>();
     
     public static void main(String[] args) throws Throwable {
+        Logger.info("Architectury Runtime " + TransformerRuntime.class.getPackage().getImplementationVersion());
         List<String> argsList = new ArrayList<>(Arrays.asList(args));
         doInstrumentationStuff();
         Path propertiesPath = Paths.get(System.getProperty(PROPERTIES));
@@ -355,14 +356,5 @@ public class TransformerRuntime {
                 throw new RuntimeException(throwable);
             }
         };
-    }
-    
-    private static File createTmpAgentJar() throws IOException {
-        File tmpAgentJar = File.createTempFile("architectury-agent", ".jar");
-        tmpAgentJar.deleteOnExit();
-        try (InputStream stream = TransformerRuntime.class.getResourceAsStream("/agent/injection.jar")) {
-            Files.copy(stream, tmpAgentJar.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        }
-        return tmpAgentJar;
     }
 }

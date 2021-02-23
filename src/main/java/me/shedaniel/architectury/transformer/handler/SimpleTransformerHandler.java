@@ -149,6 +149,7 @@ public class SimpleTransformerHandler implements TransformHandler {
         
         Path inputTmp = fillTmpInput(input);
         Path outputTmp = Files.createTempFile(null, ".jar");
+        outputTmp.toFile().deleteOnExit();
         Files.deleteIfExists(outputTmp);
         
         LoggerFilter.replaceSystemOut();
@@ -189,6 +190,7 @@ public class SimpleTransformerHandler implements TransformHandler {
     private static Path fillTmpInput(InputInterface input) throws IOException {
         Path tmpJar = Files.createTempFile(null, ".jar");
         Files.deleteIfExists(tmpJar);
+        tmpJar.toFile().deleteOnExit();
         try (JarOutputInterface outputInterface = new JarOutputInterface(tmpJar)) {
             input.handle((path, bytes) -> {
                 try {

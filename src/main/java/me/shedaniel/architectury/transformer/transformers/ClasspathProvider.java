@@ -29,7 +29,7 @@ import me.shedaniel.architectury.transformer.util.Logger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -40,6 +40,14 @@ public interface ClasspathProvider {
                 .map(Paths::get)
                 .filter(Files::exists)
                 .toArray(Path[]::new);
+    }
+    
+    static ClasspathProvider of(Path... paths) {
+        return () -> paths;
+    }
+    
+    static ClasspathProvider of(Collection<Path> paths) {
+        return () -> paths.toArray(new Path[0]);
     }
     
     Path[] provide();
@@ -58,6 +66,19 @@ public interface ClasspathProvider {
                 Logger.debug(" - " + path.toString());
             }
             return paths;
+        };
+    }
+    
+    default ClasspathProvider joining(ClasspathProvider... providers) {
+        List<ClasspathProvider> providerList = new ArrayList<>();
+        providerList.add(this);
+        Collections.addAll(providerList, providers);
+        return () -> {
+            List<Path> paths = new ArrayList<>();
+            for (ClasspathProvider provider : providerList) {
+                Collections.addAll(paths, provider.provide());
+            }
+            return paths.toArray(new Path[0]);
         };
     }
 }
