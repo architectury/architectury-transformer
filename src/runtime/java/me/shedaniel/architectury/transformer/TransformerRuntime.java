@@ -104,7 +104,7 @@ public class TransformerRuntime {
         for (Map.Entry<Path, List<Transformer>> entry : toTransform.entrySet()) {
             DirectoryOutputInterface debugOut = isDebugOutputEnabled() ? debugOuts.computeIfAbsent(entry.getKey(), key -> {
                 try {
-                    Path file = Paths.get(System.getProperty("user.dir")).resolve(".architectury-transformer/debug-" + entry.getKey().getFileName().toString() + "-" + (i.incrementAndGet()));
+                    Path file = Paths.get(System.getProperty(BuiltinProperties.LOCATION, System.getProperty("user.dir"))).resolve(".architectury-transformer/debug-" + entry.getKey().getFileName().toString() + "-" + (i.incrementAndGet()));
                     Files.createDirectories(file);
                     return DirectoryOutputInterface.of(file);
                 } catch (IOException e) {
