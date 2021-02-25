@@ -124,16 +124,24 @@ shadowJar {
     relocate "com.google", "me.shedaniel.architectury.transformer.shadowed.impl.com.google"
     relocate "javax.annotation", "me.shedaniel.architectury.transformer.shadowed.impl.javax.annotation"
     configurations = [project.configurations.compileClasspath]
-    classifier null
+    classifier "shadow"
 }
 
-build.dependsOn shadowJar
+task mainJar(type: Jar, dependsOn: shadowJar) {
+    from zipTree(shadowJar.archiveFile)
+    from(annotationsInjectJar.outputs) {
+        into "annotations-inject"
+        rename { "injection.jar" }
+    }
+}
+
+build.dependsOn mainJar
 build.dependsOn runtimeJar
 
 publishing {
     publications {
         main(MavenPublication) {
-            artifact(shadowJar)
+            artifact(mainJar)
             artifact(sourcesJar)
         }
         runtime(MavenPublication) {
