@@ -25,6 +25,7 @@ package me.shedaniel.architectury.transformer.transformers;
 
 public class BuiltinProperties {
     public static final String VERBOSE = "architectury.transformer.verbose";
+    public static final String DEBUG_OUTPUT = "architectury.transformer.debug_output";
     public static final String MIXIN_MAPPINGS = "architectury.mixin.mappings";
     public static final String INJECT_INJECTABLES = "architectury.inject.injectables";
     public static final String UNIQUE_IDENTIFIER = "architectury.unique.identifier";

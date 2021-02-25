@@ -25,13 +25,42 @@ package me.shedaniel.architectury.transformer.util;
 
 import me.shedaniel.architectury.transformer.transformers.BuiltinProperties;
 
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.stream.Stream;
+
 public class Logger {
+    private static final File logFile = new File(System.getProperty("user.dir"), ".architectury-transformer/debug.log");
     private static Boolean verbose = null;
+    private static PrintWriter writer;
     
     private Logger() {}
     
+    private static PrintWriter getWriter() {
+        if (writer == null) {
+            try {
+                if (logFile.getParentFile().exists()) {
+                    try (Stream<Path> walk = Files.walk(logFile.getParentFile().toPath())) {
+                        walk.sorted(Comparator.reverseOrder())
+                                .map(Path::toFile)
+                                .forEach(File::delete);
+                    }
+                }
+                logFile.getParentFile().mkdirs();
+                writer = new PrintWriter(new FileWriter(logFile, false), true);
+            } catch (IOException exception) {
+                throw new UncheckedIOException(exception);
+            }
+        }
+        return writer;
+    }
+    
     public static void info(String str) {
-        System.out.println("[Architectury Transformer] " + str);
+        String s = "[Architectury Transformer] " + str;
+        System.out.println(s);
+        getWriter().println(s);
     }
     
     public static void info(String str, Object... args) {
@@ -39,9 +68,11 @@ public class Logger {
     }
     
     public static void debug(String str) {
+        String s = "[Architectury Transformer DEBUG] " + str;
         if (isVerbose()) {
-            System.out.println("[Architectury Transformer DEBUG] " + str);
+            System.out.println(s);
         }
+        getWriter().println(s);
     }
     
     public static void debug(String str, Object... args) {
@@ -57,7 +88,9 @@ public class Logger {
     }
     
     public static void error(String str) {
-        System.err.println("[Architectury Transformer] " + str);
+        String s = "[Architectury Transformer] " + str;
+        System.err.println(s);
+        getWriter().println(s);
     }
     
     public static void error(String str, Object... args) {

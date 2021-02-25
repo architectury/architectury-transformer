@@ -23,9 +23,9 @@
 
 package me.shedaniel.architectury.transformer.transformers;
 
+import me.shedaniel.architectury.transformer.input.OutputInterface;
 import me.shedaniel.architectury.transformer.transformers.base.AssetEditTransformer;
 import me.shedaniel.architectury.transformer.transformers.base.ClassEditTransformer;
-import me.shedaniel.architectury.transformer.transformers.base.edit.AssetEditSink;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
 import me.shedaniel.architectury.transformer.util.Logger;
 import org.objectweb.asm.ClassReader;
@@ -46,7 +46,7 @@ import java.util.Objects;
 
 public class TransformExpectPlatform implements AssetEditTransformer, ClassEditTransformer {
     @Override
-    public void doEdit(TransformerContext context, AssetEditSink sink) throws Exception {
+    public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
         if (RemapInjectables.isInjectInjectables() && context.canAddClasses()) {
             try (InputStream stream = TransformExpectPlatform.class.getResourceAsStream("/annotations-inject/injection.jar")) {
                 ZipUtil.iterate(stream, (input, entry) -> {
@@ -77,7 +77,7 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
                         node.accept(remapper);
                         
                         try {
-                            sink.addClass(newName, writer.toByteArray());
+                            output.addClass(newName, writer.toByteArray());
                         } catch (Exception e) {
                             throw new RuntimeException(e);
                         }

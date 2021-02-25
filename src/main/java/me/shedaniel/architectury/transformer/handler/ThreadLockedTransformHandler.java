@@ -24,7 +24,6 @@
 package me.shedaniel.architectury.transformer.handler;
 
 import me.shedaniel.architectury.transformer.Transformer;
-import me.shedaniel.architectury.transformer.input.InputInterface;
 import me.shedaniel.architectury.transformer.input.OutputInterface;
 
 import java.io.IOException;
@@ -45,7 +44,7 @@ public class ThreadLockedTransformHandler implements TransformHandler {
     }
     
     @Override
-    public void handle(InputInterface input, OutputInterface output, List<Transformer> transformers) throws Exception {
+    public void handle(String input, OutputInterface output, List<Transformer> transformers) throws Exception {
         lock.lock();
         try {
             this.parent.handle(input, output, transformers);

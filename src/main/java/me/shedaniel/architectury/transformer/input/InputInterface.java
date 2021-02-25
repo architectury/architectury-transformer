@@ -23,10 +23,40 @@
 
 package me.shedaniel.architectury.transformer.input;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.function.BiConsumer;
+import me.shedaniel.architectury.transformer.util.Logger;
 
-public interface InputInterface extends Closeable {
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+
+public interface InputInterface extends ClosedIndicator {
+    default void handle(Consumer<String> action) throws IOException {
+        handle((path, bytes) -> action.accept(path));
+    }
+    
     void handle(BiConsumer<String, byte[]> action) throws IOException;
+    
+    default void copyTo(OutputInterface output) throws IOException {
+        copyTo(path -> true, output);
+    }
+    
+    default void copyTo(Predicate<String> pathPredicate, OutputInterface output) throws IOException {
+        try {
+            handle((path, bytes) -> {
+                try {
+                    if (pathPredicate.test(path)) {
+                        if (!output.addFile(path, bytes)) {
+                            Logger.debug("Failed to copy %s from %s to %s", path, this, output);
+                        }
+                    }
+                } catch (IOException exception) {
+                    throw new UncheckedIOException(exception);
+                }
+            });
+        } catch (UncheckedIOException exception) {
+            throw exception.getCause();
+        }
+    }
 }

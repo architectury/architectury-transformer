@@ -23,9 +23,9 @@
 
 package me.shedaniel.architectury.transformer.util;
 
-import java.io.Closeable;
+import me.shedaniel.architectury.transformer.input.ClosedIndicator;
 
-public abstract class ClosableChecker implements Closeable {
+public abstract class ClosableChecker implements ClosedIndicator {
     private boolean closed = false;
     
     protected void validateCloseState() {
@@ -36,5 +36,10 @@ public abstract class ClosableChecker implements Closeable {
     
     protected void closeAndValidate() {
         closed = true;
+    }
+    
+    @Override
+    public boolean isClosed() {
+        return closed;
     }
 }

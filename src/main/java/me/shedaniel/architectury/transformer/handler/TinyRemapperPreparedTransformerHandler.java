@@ -25,6 +25,7 @@ package me.shedaniel.architectury.transformer.handler;
 
 import me.shedaniel.architectury.transformer.transformers.ClasspathProvider;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
+import me.shedaniel.architectury.transformer.util.Logger;
 import net.fabricmc.tinyremapper.ClassInstance;
 import net.fabricmc.tinyremapper.IMappingProvider;
 import net.fabricmc.tinyremapper.TinyRemapper;
@@ -42,6 +43,7 @@ public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHan
     }
     
     private void prepare() throws Exception {
+        Logger.debug("Preparing tiny remapper prepared transformer: " + getClass().getName());
         remapper = TinyRemapper.newRemapper().build();
         
         remapper.readClassPath(classpath.provide());
@@ -70,12 +72,16 @@ public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHan
     }
     
     private Map<String, ClassInstance> tmpClasses;
+    private Map<String, ClassInstance> tmpReadClasses;
     
     @Override
     public TinyRemapper getRemapper(List<IMappingProvider> providers) throws Exception {
         Field classesField = remapper.getClass().getDeclaredField("classes");
         classesField.setAccessible(true);
         tmpClasses = new HashMap<>((Map<String, ClassInstance>) classesField.get(remapper));
+        Field readClassesField = remapper.getClass().getDeclaredField("readClasses");
+        readClassesField.setAccessible(true);
+        tmpReadClasses = new HashMap<>((Map<String, ClassInstance>) readClassesField.get(remapper));
         resetTR(providers);
         return remapper;
     }
@@ -87,6 +93,12 @@ public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHan
             classesField.setAccessible(true);
             classesField.set(remapper, tmpClasses);
             tmpClasses = null;
+        }
+        if (tmpReadClasses != null) {
+            Field readClassesField = remapper.getClass().getDeclaredField("readClasses");
+            readClassesField.setAccessible(true);
+            readClassesField.set(remapper, tmpReadClasses);
+            tmpReadClasses = null;
         }
         resetTR(Collections.emptyList());
     }

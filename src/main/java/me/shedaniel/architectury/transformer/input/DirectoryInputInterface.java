@@ -31,15 +31,47 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public class DirectoryInputInterface extends ClosableChecker implements InputInterface {
-    private final Path root;
-    private final Map<Path, byte[]> cache = new HashMap<>();
+    private static final WeakHashMap<Path, DirectoryInputInterface> INTERFACES = new WeakHashMap<>();
+    protected final Path root;
+    protected final Map<Path, byte[]> cache = new HashMap<>();
     
-    public DirectoryInputInterface(Path root) {
+    protected DirectoryInputInterface(Path root) {
         this.root = root;
+    }
+    
+    public static DirectoryInputInterface of(Path root) throws IOException {
+        synchronized (INTERFACES) {
+            if (INTERFACES.containsKey(root)) {
+                return INTERFACES.get(root);
+            }
+            
+            for (Map.Entry<Path, DirectoryInputInterface> entry : INTERFACES.entrySet()) {
+                if (Files.isSameFile(entry.getKey(), root)) {
+                    return entry.getValue();
+                }
+            }
+            
+            DirectoryInputInterface inputInterface = new DirectoryInputInterface(root);
+            INTERFACES.put(root, inputInterface);
+            return inputInterface;
+        }
+    }
+    
+    @Override
+    public void handle(Consumer<String> action) throws IOException {
+        validateCloseState();
+        try (Stream<Path> stream = Files.walk(root)) {
+            stream.forEachOrdered(path -> {
+                if (Files.isDirectory(path)) return;
+                action.accept(path.toString());
+            });
+        }
     }
     
     @Override
@@ -57,12 +89,14 @@ public class DirectoryInputInterface extends ClosableChecker implements InputInt
                 }));
             });
         }
+        cache.clear();
     }
     
     @Override
     public void close() throws IOException {
         closeAndValidate();
         cache.clear();
+        INTERFACES.remove(root);
     }
     
     @Override

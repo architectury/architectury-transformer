@@ -24,7 +24,9 @@
 package me.shedaniel.architectury.transformer;
 
 import me.shedaniel.architectury.transformer.handler.SimpleTransformerHandler;
-import me.shedaniel.architectury.transformer.input.*;
+import me.shedaniel.architectury.transformer.input.InputInterface;
+import me.shedaniel.architectury.transformer.input.OpenedOutputInterface;
+import me.shedaniel.architectury.transformer.input.OutputInterface;
 import me.shedaniel.architectury.transformer.transformers.BuiltinProperties;
 import me.shedaniel.architectury.transformer.transformers.ClasspathProvider;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
@@ -34,7 +36,6 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.zeroturnaround.zip.commons.IOUtils;
-import sun.rmi.runtime.Log;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -103,15 +104,13 @@ public class Transform {
         logTime(() -> {
             if (Files.isDirectory(input)) {
                 copyDirectory(input, output);
-                try (DirectoryInputInterface inputInterface = new DirectoryInputInterface(input);
-                     DirectoryOutputInterface outputInterface = new DirectoryOutputInterface(output)) {
-                    runTransformers(context, classpath, inputInterface, outputInterface, transformers);
+                try (OpenedOutputInterface outputInterface = OpenedOutputInterface.ofDirectory(output)) {
+                    runTransformers(context, classpath, input.toString(), outputInterface, transformers);
                 }
             } else {
                 Files.copy(input, output, StandardCopyOption.REPLACE_EXISTING);
-                try (JarInputInterface inputInterface = new JarInputInterface(input);
-                     JarOutputInterface outputInterface = new JarOutputInterface(output)) {
-                    runTransformers(context, classpath, inputInterface, outputInterface, transformers);
+                try (OpenedOutputInterface outputInterface = OpenedOutputInterface.ofJar(input)) {
+                    runTransformers(context, classpath, input.toString(), outputInterface, transformers);
                 }
             }
         }, "Transformed jar with " + transformers.size() + " transformer(s)");
@@ -119,11 +118,15 @@ public class Transform {
     
     public static void runTransformers(TransformerContext context, ClasspathProvider classpath, InputInterface input, OutputInterface output, List<Transformer> transformers)
             throws Exception {
+        runTransformers(context, classpath, input.toString(), output, transformers);
+    }
+    
+    public static void runTransformers(TransformerContext context, ClasspathProvider classpath, String input, OutputInterface output, List<Transformer> transformers)
+            throws Exception {
         try (SimpleTransformerHandler handler = new SimpleTransformerHandler(classpath, context)) {
             handler.handle(input, output, transformers);
         }
     }
-    
     
     public static void logTime(DoThing doThing, String task) throws Exception {
         measureTime(doThing, (duration) -> {

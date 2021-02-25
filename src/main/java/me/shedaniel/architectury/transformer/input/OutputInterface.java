@@ -25,10 +25,42 @@ package me.shedaniel.architectury.transformer.input;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-public interface OutputInterface extends Closeable {
-    void addFile(String path, byte[] bytes) throws IOException;
+public interface OutputInterface extends Closeable, InputInterface {
+    boolean addFile(String path, byte[] bytes) throws IOException;
     
-    void modifyFile(String path, UnaryOperator<byte[]> action) throws IOException;
+    byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException;
+    
+    default void modifyFiles(Predicate<String> pathPredicate, BiFunction<String, byte[], byte[]> action) throws IOException {
+        try {
+            handle(path -> {
+                if (pathPredicate.test(path)) {
+                    try {
+                        modifyFile(path, bytes -> action.apply(path, bytes));
+                    } catch (IOException exception) {
+                        throw new UncheckedIOException(exception);
+                    }
+                }
+            });
+        } catch (UncheckedIOException exception) {
+            throw exception.getCause();
+        }
+    }
+    
+    default void modifyFiles(BiFunction<String, byte[], byte[]> action) throws IOException {
+        modifyFiles(path -> true, action);
+    }
+    
+    default boolean addFile(String path, String text) throws IOException {
+        return addFile(path, text.getBytes(StandardCharsets.UTF_8));
+    }
+    
+    default boolean addClass(String path, byte[] bytes) throws IOException {
+        return addFile(path + ".class", bytes);
+    }
 }

@@ -23,7 +23,7 @@
 
 package me.shedaniel.architectury.transformer.transformers;
 
-import me.shedaniel.architectury.transformer.transformers.base.edit.AssetEditSink;
+import me.shedaniel.architectury.transformer.input.OutputInterface;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -35,17 +35,17 @@ import org.objectweb.asm.Opcodes;
  */
 public class GenerateFakeForgeMod extends AbstractFakeMod {
     @Override
-    public void doEdit(TransformerContext context, AssetEditSink sink) throws Exception {
+    public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
         String fakeModId = generateModId();
-        sink.addFile("META-INF/mods.toml",
+        output.addFile("META-INF/mods.toml",
                 "modLoader = \"javafml\"\n" +
                 "loaderVersion = \"[33,)\"\n" +
                 "license = \"Generated\"\n" +
                 "[[mods]]\n" +
                 "modId = \"" + fakeModId + "\"\n");
-        sink.addFile("pack.mcmeta",
+        output.addFile("pack.mcmeta",
                 "{\"pack\":{\"description\":\"Generated\",\"pack_format\":" + System.getProperty(BuiltinProperties.MCMETA_VERSION, "4") + "}}");
-        sink.addFile("generated/" + fakeModId + ".class", generateClass(fakeModId));
+        output.addFile("generated/" + fakeModId + ".class", generateClass(fakeModId));
     }
     
     private byte[] generateClass(String fakeModId) {

@@ -23,34 +23,54 @@
 
 package me.shedaniel.architectury.transformer.input;
 
-import me.shedaniel.architectury.transformer.util.ClosableChecker;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.function.UnaryOperator;
 
-public class DirectoryOutputInterface extends ClosableChecker implements OutputInterface {
-    private final Path root;
+public class DirectoryOutputInterface extends DirectoryInputInterface implements OutputInterface {
+    private static final WeakHashMap<Path, DirectoryOutputInterface> INTERFACES = new WeakHashMap<>();
     
-    public DirectoryOutputInterface(Path root) {
-        this.root = root;
+    protected DirectoryOutputInterface(Path root) {
+        super(root);
+    }
+    
+    public static DirectoryOutputInterface of(Path root) throws IOException {
+        synchronized (INTERFACES) {
+            if (INTERFACES.containsKey(root)) {
+                return INTERFACES.get(root);
+            }
+            
+            for (Map.Entry<Path, DirectoryOutputInterface> entry : INTERFACES.entrySet()) {
+                if (Files.isSameFile(entry.getKey(), root)) {
+                    return entry.getValue();
+                }
+            }
+            
+            DirectoryOutputInterface outputInterface = new DirectoryOutputInterface(root);
+            INTERFACES.put(root, outputInterface);
+            return outputInterface;
+        }
     }
     
     @Override
-    public void addFile(String path, byte[] bytes) throws IOException {
+    public boolean addFile(String path, byte[] bytes) throws IOException {
         validateCloseState();
+        if (bytes == null) return false;
         Path p = root.resolve(path);
         Path parent = p.normalize().getParent();
         if (parent != null && !Files.exists(parent)) {
             Files.createDirectories(parent);
         }
         Files.write(p, bytes, StandardOpenOption.CREATE);
+        return true;
     }
     
     @Override
-    public void modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
+    public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
         validateCloseState();
         Path file = root.resolve(path);
         
@@ -62,12 +82,16 @@ public class DirectoryOutputInterface extends ClosableChecker implements OutputI
                 throw new RuntimeException("Failed to modify " + path, e);
             }
             addFile(path, bytes);
+            return bytes;
         }
+        
+        return null;
     }
     
     @Override
     public void close() throws IOException {
         closeAndValidate();
+        INTERFACES.remove(root);
     }
     
     @Override

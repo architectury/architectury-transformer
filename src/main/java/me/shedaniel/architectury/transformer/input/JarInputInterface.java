@@ -32,16 +32,19 @@ import java.net.URISyntaxException;
 import java.nio.file.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public class JarInputInterface extends ClosableChecker implements InputInterface {
+    private static final WeakHashMap<Path, JarInputInterface> INTERFACES = new WeakHashMap<>();
     private final Path path;
     private boolean shouldCloseFs;
     private FileSystem fs;
-    private final Map<Path, byte[]> cache = new HashMap<>();
+    protected final Map<Path, byte[]> cache = new HashMap<>();
     
-    public JarInputInterface(Path path) {
+    protected JarInputInterface(Path path) {
         this.path = path;
         Map<String, String> env = new HashMap<>();
         env.put("create", String.valueOf(Files.notExists(path)));
@@ -65,6 +68,37 @@ public class JarInputInterface extends ClosableChecker implements InputInterface
         }
     }
     
+    public static JarInputInterface of(Path root) throws IOException {
+        synchronized (INTERFACES) {
+            if (INTERFACES.containsKey(root)) {
+                return INTERFACES.get(root);
+            }
+            
+            for (Map.Entry<Path, JarInputInterface> entry : INTERFACES.entrySet()) {
+                if (Files.isSameFile(entry.getKey(), root)) {
+                    return entry.getValue();
+                }
+            }
+            
+            JarInputInterface inputInterface = new JarInputInterface(root);
+            INTERFACES.put(root, inputInterface);
+            return inputInterface;
+        }
+    }
+    
+    @Override
+    public void handle(Consumer<String> action) throws IOException {
+        validateCloseState();
+        for (Path root : getFS().getRootDirectories()) {
+            try (Stream<Path> stream = Files.walk(root)) {
+                stream.forEachOrdered(path -> {
+                    if (Files.isDirectory(path)) return;
+                    action.accept(path.toString());
+                });
+            }
+        }
+    }
+    
     @Override
     public void handle(BiConsumer<String, byte[]> action) throws IOException {
         validateCloseState();
@@ -82,6 +116,7 @@ public class JarInputInterface extends ClosableChecker implements InputInterface
                 });
             }
         }
+        cache.clear();
     }
     
     @Override
@@ -93,7 +128,7 @@ public class JarInputInterface extends ClosableChecker implements InputInterface
         cache.clear();
     }
     
-    private FileSystem getFS() {
+    protected FileSystem getFS() {
         validateCloseState();
         if (!shouldCloseFs && !fs.isOpen()) {
             try {

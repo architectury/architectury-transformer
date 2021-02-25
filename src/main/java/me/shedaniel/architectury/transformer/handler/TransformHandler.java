@@ -24,7 +24,6 @@
 package me.shedaniel.architectury.transformer.handler;
 
 import me.shedaniel.architectury.transformer.Transformer;
-import me.shedaniel.architectury.transformer.input.InputInterface;
 import me.shedaniel.architectury.transformer.input.OutputInterface;
 
 import java.io.Closeable;
@@ -35,5 +34,5 @@ public interface TransformHandler extends Closeable {
         return new ThreadLockedTransformHandler(this);
     }
     
-    void handle(InputInterface input, OutputInterface output,  List<Transformer> transformers) throws Exception;
+    void handle(String input, OutputInterface output,  List<Transformer> transformers) throws Exception;
 }

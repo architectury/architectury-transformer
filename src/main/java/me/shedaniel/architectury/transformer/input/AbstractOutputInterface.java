@@ -21,28 +21,33 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer.transformers.base.edit;
+package me.shedaniel.architectury.transformer.input;
+
+import me.shedaniel.architectury.transformer.util.ClosableChecker;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.function.BiConsumer;
-import java.util.function.UnaryOperator;
 
-public interface AssetEditSink {
-    void handle(BiConsumer<String, byte[]> action) throws IOException;
+public abstract class AbstractOutputInterface extends ClosableChecker implements OutputInterface {
+    protected InputInterface inputInterface;
     
-    void addFile(String path, byte[] bytes) throws IOException;
-    
-    /**
-     * Requires {@link TransformerContext#canModifyAssets()}
-     */
-    void transformFile(String path, UnaryOperator<byte[]> transformer) throws IOException;
-    
-    default void addFile(String path, String text) throws IOException {
-        addFile(path, text.getBytes(StandardCharsets.UTF_8));
+    public AbstractOutputInterface(InputInterface inputInterface) {
+        this.inputInterface = inputInterface;
     }
     
-    default void addClass(String path, byte[] bytes) throws IOException {
-        addFile(path + ".class", bytes);
+    @Override
+    public void handle(BiConsumer<String, byte[]> action) throws IOException {
+        validateCloseState();
+        if (inputInterface != null) {
+            inputInterface.handle(action);
+        }
+    }
+    
+    @Override
+    public void close() throws IOException {
+        validateCloseState();
+        if (inputInterface != null) {
+            inputInterface.close();
+        }
     }
 }

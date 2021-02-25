@@ -23,7 +23,7 @@
 
 package me.shedaniel.architectury.transformer.transformers;
 
-import me.shedaniel.architectury.transformer.transformers.base.edit.AssetEditSink;
+import me.shedaniel.architectury.transformer.input.OutputInterface;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
 
 /**
@@ -31,9 +31,9 @@ import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerC
  */
 public class GenerateFakeFabricMod extends AbstractFakeMod {
     @Override
-    public void doEdit(TransformerContext context, AssetEditSink sink) throws Exception {
+    public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
         String fakeModId = generateModId();
-        sink.addFile("fabric.mod.json",
+        output.addFile("fabric.mod.json",
                 "{\n" +
                 "  \"schemaVersion\": 1,\n" +
                 "  \"id\": \"" + fakeModId + "\",\n" +

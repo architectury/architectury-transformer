@@ -25,8 +25,8 @@ package me.shedaniel.architectury.transformer.transformers;
 
 import com.google.gson.*;
 import me.shedaniel.architectury.transformer.Transform;
+import me.shedaniel.architectury.transformer.input.OutputInterface;
 import me.shedaniel.architectury.transformer.transformers.base.AssetEditTransformer;
-import me.shedaniel.architectury.transformer.transformers.base.edit.AssetEditSink;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
 import me.shedaniel.architectury.transformer.util.Logger;
 import net.fabricmc.mapping.tree.ClassDef;
@@ -51,11 +51,11 @@ public class FixForgeMixin implements AssetEditTransformer {
     private TinyTree srg;
     
     @Override
-    public void doEdit(TransformerContext context, AssetEditSink sink) throws Exception {
+    public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
         Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
         List<String> mixinConfigs = new ArrayList<>();
         String refmap = System.getProperty(BuiltinProperties.REFMAP_NAME);
-        sink.handle((path, bytes) -> {
+        output.handle((path, bytes) -> {
             String trimmedPath = Transform.stripLoadingSlash(path);
             if (trimmedPath.endsWith(".json") && !trimmedPath.contains("/") && !trimmedPath.contains("\\")) {
                 Logger.debug("Checking whether " + path + " is a mixin config.");
@@ -77,7 +77,7 @@ public class FixForgeMixin implements AssetEditTransformer {
             Logger.debug("Found mixin config(s): " + String.join(",", mixinConfigs));
         }
         if (context.canModifyAssets()) {
-            sink.transformFile("META-INF/MANIFEST.MF", bytes -> {
+            output.modifyFile("META-INF/MANIFEST.MF", bytes -> {
                 try {
                     Logger.debug("Injecting MixinConfigs into /META-INF/MANIFEST.MF");
                     Manifest manifest = new Manifest(new ByteArrayInputStream(bytes));
@@ -98,7 +98,7 @@ public class FixForgeMixin implements AssetEditTransformer {
         }
         if (refmap != null) {
             Logger.debug("Remapping refmap from intermediary to srg: " + refmap);
-            sink.transformFile(refmap, bytes -> {
+            output.modifyFile(refmap, bytes -> {
                 try {
                     JsonObject refmapElement = new JsonParser().parse(new InputStreamReader(new ByteArrayInputStream(bytes))).getAsJsonObject().deepCopy();
                     if (refmapElement.has("mappings")) {

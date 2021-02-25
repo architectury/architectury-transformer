@@ -23,58 +23,54 @@
 
 package me.shedaniel.architectury.transformer.input;
 
-import me.shedaniel.architectury.transformer.util.ClosableChecker;
-
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.*;
-import java.util.HashMap;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.function.UnaryOperator;
 
-public class JarOutputInterface extends ClosableChecker implements OutputInterface {
-    private final Path path;
-    private boolean shouldCloseFs;
-    private FileSystem fs;
+public class JarOutputInterface extends JarInputInterface implements OutputInterface {
+    private static final WeakHashMap<Path, JarOutputInterface> INTERFACES = new WeakHashMap<>();
     
-    public JarOutputInterface(Path path) {
-        this.path = path;
-        Map<String, String> env = new HashMap<>();
-        env.put("create", String.valueOf(Files.notExists(path)));
-        
-        try {
-            URI uri = new URI("jar:" + path.toUri());
-            FileSystem fs;
-            boolean shouldCloseFs = false;
-            
-            try {
-                fs = FileSystems.getFileSystem(uri);
-            } catch (FileSystemNotFoundException exception) {
-                fs = FileSystems.newFileSystem(uri, env);
-                shouldCloseFs = true;
+    protected JarOutputInterface(Path path) {
+        super(path);
+    }
+    
+    public static JarOutputInterface of(Path root) throws IOException {
+        synchronized (INTERFACES) {
+            if (INTERFACES.containsKey(root)) {
+                return INTERFACES.get(root);
             }
             
-            this.fs = fs;
-            this.shouldCloseFs = shouldCloseFs;
-        } catch (IOException | URISyntaxException exception) {
-            throw new RuntimeException(exception);
+            for (Map.Entry<Path, JarOutputInterface> entry : INTERFACES.entrySet()) {
+                if (Files.isSameFile(entry.getKey(), root)) {
+                    return entry.getValue();
+                }
+            }
+            
+            JarOutputInterface outputInterface = new JarOutputInterface(root);
+            INTERFACES.put(root, outputInterface);
+            return outputInterface;
         }
     }
     
     @Override
-    public void addFile(String path, byte[] bytes) throws IOException {
+    public boolean addFile(String path, byte[] bytes) throws IOException {
         validateCloseState();
+        if (bytes == null) return false;
         Path p = getFS().getPath(path);
         Path parent = p.normalize().getParent();
         if (parent != null && !Files.exists(parent)) {
             Files.createDirectories(parent);
         }
         Files.write(p, bytes, StandardOpenOption.CREATE);
+        return true;
     }
     
     @Override
-    public void modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
+    public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
         validateCloseState();
         Path fsPath = getFS().getPath(path);
         
@@ -86,39 +82,9 @@ public class JarOutputInterface extends ClosableChecker implements OutputInterfa
                 throw new RuntimeException("Failed to modify " + path, e);
             }
             addFile(path, bytes);
+            return bytes;
         }
-    }
-    
-    @Override
-    public void close() throws IOException {
-        closeAndValidate();
-        if (shouldCloseFs) {
-            fs.close();
-        }
-    }
-    
-    private FileSystem getFS() {
-        validateCloseState();
-        if (!shouldCloseFs && !fs.isOpen()) {
-            try {
-                Map<String, String> env = new HashMap<>();
-                env.put("create", String.valueOf(Files.notExists(path)));
-                URI uri = new URI("jar:" + path.toUri());
-                fs = FileSystems.newFileSystem(uri, env);
-                shouldCloseFs = true;
-                return fs;
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-        if (!fs.isOpen()) {
-            throw new ClosedFileSystemException();
-        }
-        return fs;
-    }
-    
-    @Override
-    public String toString() {
-        return path.toString();
+        
+        return null;
     }
 }
