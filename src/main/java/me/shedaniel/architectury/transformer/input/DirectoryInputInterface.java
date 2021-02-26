@@ -96,7 +96,7 @@ public class DirectoryInputInterface extends ClosableChecker implements InputInt
     public void close() throws IOException {
         closeAndValidate();
         cache.clear();
-        INTERFACES.remove(root);
+        INTERFACES.remove(root, this);
     }
     
     @Override

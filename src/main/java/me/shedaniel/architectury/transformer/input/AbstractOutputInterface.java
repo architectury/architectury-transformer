@@ -27,12 +27,21 @@ import me.shedaniel.architectury.transformer.util.ClosableChecker;
 
 import java.io.IOException;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public abstract class AbstractOutputInterface extends ClosableChecker implements OutputInterface {
     protected InputInterface inputInterface;
     
     public AbstractOutputInterface(InputInterface inputInterface) {
         this.inputInterface = inputInterface;
+    }
+    
+    @Override
+    public void handle(Consumer<String> action) throws IOException {
+        validateCloseState();
+        if (inputInterface != null) {
+            inputInterface.handle(action);
+        }
     }
     
     @Override

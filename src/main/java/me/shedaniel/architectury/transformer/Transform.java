@@ -109,7 +109,7 @@ public class Transform {
                 }
             } else {
                 Files.copy(input, output, StandardCopyOption.REPLACE_EXISTING);
-                try (OpenedOutputInterface outputInterface = OpenedOutputInterface.ofJar(input)) {
+                try (OpenedOutputInterface outputInterface = OpenedOutputInterface.ofJar(output)) {
                     runTransformers(context, classpath, input.toString(), outputInterface, transformers);
                 }
             }

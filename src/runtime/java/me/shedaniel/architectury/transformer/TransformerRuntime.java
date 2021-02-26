@@ -161,7 +161,7 @@ public class TransformerRuntime {
                         }
                     }, ClasspathProvider.fromProperties().filter(path -> {
                         return !Objects.equals(entry.getKey().toFile().getAbsoluteFile(), path.toFile().getAbsoluteFile());
-                    }), inputInterface, new AbstractOutputInterface(inputInterface) {
+                    }), entry.getKey().toString(), new AbstractOutputInterface(inputInterface) {
                         @Override
                         public boolean addFile(String path, byte[] bytes) throws IOException {
                             String s = stripLeadingSlash.apply(path);
@@ -226,7 +226,7 @@ public class TransformerRuntime {
                             }
                         }, ClasspathProvider.fromProperties().filter(classpathPath -> {
                             return !Objects.equals(entry.getKey().toFile().getAbsoluteFile(), classpathPath.toFile().getAbsoluteFile());
-                        }), inputInterface, new AbstractOutputInterface(inputInterface) {
+                        }), entry.getKey().toString(), new AbstractOutputInterface(inputInterface) {
                             @Override
                             public boolean addFile(String path, byte[] bytes) throws IOException {
                                 String s = stripLeadingSlash.apply(path);

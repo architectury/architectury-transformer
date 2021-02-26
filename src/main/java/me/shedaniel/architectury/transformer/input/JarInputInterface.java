@@ -39,7 +39,7 @@ import java.util.stream.Stream;
 
 public class JarInputInterface extends ClosableChecker implements InputInterface {
     private static final WeakHashMap<Path, JarInputInterface> INTERFACES = new WeakHashMap<>();
-    private final Path path;
+    protected final Path path;
     private boolean shouldCloseFs;
     private FileSystem fs;
     protected final Map<Path, byte[]> cache = new HashMap<>();
@@ -126,6 +126,7 @@ public class JarInputInterface extends ClosableChecker implements InputInterface
             fs.close();
         }
         cache.clear();
+        INTERFACES.remove(path, this);
     }
     
     protected FileSystem getFS() {

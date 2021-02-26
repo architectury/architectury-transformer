@@ -23,7 +23,6 @@
 
 package me.shedaniel.architectury.transformer.input;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +30,7 @@ import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-public interface OutputInterface extends Closeable, InputInterface {
+public interface OutputInterface extends InputInterface {
     boolean addFile(String path, byte[] bytes) throws IOException;
     
     byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException;

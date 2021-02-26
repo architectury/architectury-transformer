@@ -27,7 +27,15 @@ import java.io.IOException;
 import java.util.function.BiConsumer;
 import java.util.function.UnaryOperator;
 
-public class NullOutputInterface implements OutputInterface {
+public final class NullOutputInterface implements OutputInterface {
+    private static final NullOutputInterface INSTANCE = new NullOutputInterface();
+    
+    private NullOutputInterface() {}
+    
+    public static OutputInterface of() {
+        return INSTANCE;
+    }
+    
     @Override
     public boolean addFile(String path, byte[] bytes) throws IOException {
         return false;

@@ -91,7 +91,7 @@ public class DirectoryOutputInterface extends DirectoryInputInterface implements
     @Override
     public void close() throws IOException {
         closeAndValidate();
-        INTERFACES.remove(root);
+        INTERFACES.remove(root, this);
     }
     
     @Override

@@ -29,18 +29,25 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 public class Logger {
-    private static final File logFile = new File(System.getProperty(BuiltinProperties.LOCATION, System.getProperty("user.dir")), ".architectury-transformer/debug.log");
+    private static String previousLocation = null;
     private static Boolean verbose = null;
     private static PrintWriter writer;
     
     private Logger() {}
     
     private static PrintWriter getWriter() {
-        if (writer == null) {
+        String dir = System.getProperty(BuiltinProperties.LOCATION, System.getProperty("user.dir"));
+        if (writer == null || !Objects.equals(dir, previousLocation)) {
+            previousLocation = dir;
+            if (writer != null) {
+                writer.close();
+            }
             try {
+                File logFile = new File(dir, ".architectury-transformer/debug.log");
                 if (logFile.getParentFile().exists()) {
                     try (Stream<Path> walk = Files.walk(logFile.getParentFile().toPath())) {
                         walk.sorted(Comparator.reverseOrder())

@@ -87,4 +87,10 @@ public class JarOutputInterface extends JarInputInterface implements OutputInter
         
         return null;
     }
+    
+    @Override
+    public void close() throws IOException {
+        super.close();
+        INTERFACES.remove(path, this);
+    }
 }
