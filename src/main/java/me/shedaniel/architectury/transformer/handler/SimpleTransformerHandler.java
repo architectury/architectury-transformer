@@ -42,9 +42,7 @@ import org.objectweb.asm.tree.ClassNode;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
@@ -62,7 +60,7 @@ public class SimpleTransformerHandler implements TransformHandler {
     public void handle(String input, OutputInterface output, List<Transformer> transformers) throws Exception {
         if (closed) throw new IllegalStateException("Cannot transform when the handler is closed already!");
         Logger.debug("Remapping from " + input + " to " + output + " with " + transformers.size() + " transformer(s) on " + getClass().getName());
-        List<IMappingProvider> mappingProviders = new ArrayList<>();
+        Set<IMappingProvider> mappingProviders = new HashSet<>();
         Function<String, UnaryOperator<ClassNode>>[] classTransformer = new Function[]{null};
         
         for (Transformer transformer : transformers) {
@@ -112,7 +110,7 @@ public class SimpleTransformerHandler implements TransformHandler {
         }
     }
     
-    private void remapTR(List<IMappingProvider> mappingProviders, String input, OutputInterface output) throws Exception {
+    private void remapTR(Set<IMappingProvider> mappingProviders, String input, OutputInterface output) throws Exception {
         TinyRemapper remapper = getRemapper(mappingProviders);
         
         LoggerFilter.replaceSystemOut();
@@ -148,7 +146,7 @@ public class SimpleTransformerHandler implements TransformHandler {
         });
     }
     
-    protected TinyRemapper getRemapper(List<IMappingProvider> providers) throws Exception {
+    protected TinyRemapper getRemapper(Set<IMappingProvider> providers) throws Exception {
         TinyRemapper.Builder builder = TinyRemapper.newRemapper();
         for (IMappingProvider provider : providers) {
             builder.withMappings(provider);

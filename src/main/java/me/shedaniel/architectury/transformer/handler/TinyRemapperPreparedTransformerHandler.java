@@ -30,7 +30,7 @@ import net.fabricmc.tinyremapper.IMappingProvider;
 import net.fabricmc.tinyremapper.TinyRemapper;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.Set;
 
 public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHandler {
     private TinyRemapper remapper;
@@ -49,8 +49,11 @@ public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHan
     }
     
     @Override
-    public TinyRemapper getRemapper(List<IMappingProvider> providers) throws Exception {
+    public TinyRemapper getRemapper(Set<IMappingProvider> providers) throws Exception {
         remapper.replaceMappings(providers);
+        if (remapper.isMappingsDirty()) {
+            Logger.debug("Remapping with Dirty Mappings...");
+        }
         return remapper;
     }
     
