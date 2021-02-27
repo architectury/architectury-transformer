@@ -26,13 +26,11 @@ package me.shedaniel.architectury.transformer.handler;
 import me.shedaniel.architectury.transformer.transformers.ClasspathProvider;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
 import me.shedaniel.architectury.transformer.util.Logger;
-import net.fabricmc.tinyremapper.ClassInstance;
 import net.fabricmc.tinyremapper.IMappingProvider;
 import net.fabricmc.tinyremapper.TinyRemapper;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.util.*;
+import java.util.List;
 
 public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHandler {
     private TinyRemapper remapper;
@@ -44,63 +42,21 @@ public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHan
     
     private void prepare() throws Exception {
         Logger.debug("Preparing tiny remapper prepared transformer: " + getClass().getName());
-        remapper = TinyRemapper.newRemapper().skipConflictsChecking(true).build();
+        remapper = TinyRemapper.newRemapper().skipConflictsChecking(true).cacheMappings(true).build();
         
         remapper.readClassPath(classpath.provide());
+        remapper.prepareClasses();
     }
-    
-    private void resetTR(Collection<IMappingProvider> mappingProviders) throws Exception {
-        Field outputBufferField = remapper.getClass().getDeclaredField("outputBuffer");
-        outputBufferField.setAccessible(true);
-        outputBufferField.set(remapper, null);
-        
-        resetTRMap("classMap");
-        resetTRMap("methodMap");
-        resetTRMap("methodArgMap");
-        resetTRMap("fieldMap");
-        
-        Field mappingProvidersField = remapper.getClass().getDeclaredField("mappingProviders");
-        mappingProvidersField.setAccessible(true);
-        ((Collection<IMappingProvider>) mappingProvidersField.get(remapper)).clear();
-        ((Collection<IMappingProvider>) mappingProvidersField.get(remapper)).addAll(mappingProviders);
-    }
-    
-    private void resetTRMap(String fieldName) throws Exception {
-        Field field = remapper.getClass().getDeclaredField(fieldName);
-        field.setAccessible(true);
-        ((Map) field.get(remapper)).clear();
-    }
-    
-    private Map<String, ClassInstance> tmpClasses;
-    private Map<String, ClassInstance> tmpReadClasses;
     
     @Override
     public TinyRemapper getRemapper(List<IMappingProvider> providers) throws Exception {
-        Field classesField = remapper.getClass().getDeclaredField("classes");
-        classesField.setAccessible(true);
-        tmpClasses = new HashMap<>((Map<String, ClassInstance>) classesField.get(remapper));
-        Field readClassesField = remapper.getClass().getDeclaredField("readClasses");
-        readClassesField.setAccessible(true);
-        tmpReadClasses = new HashMap<>((Map<String, ClassInstance>) readClassesField.get(remapper));
-        resetTR(providers);
+        remapper.replaceMappings(providers);
         return remapper;
     }
     
     @Override
     protected void closeRemapper(TinyRemapper remapper) throws Exception {
-        if (tmpClasses != null) {
-            Field classesField = remapper.getClass().getDeclaredField("classes");
-            classesField.setAccessible(true);
-            classesField.set(remapper, tmpClasses);
-            tmpClasses = null;
-        }
-        if (tmpReadClasses != null) {
-            Field readClassesField = remapper.getClass().getDeclaredField("readClasses");
-            readClassesField.setAccessible(true);
-            readClassesField.set(remapper, tmpReadClasses);
-            tmpReadClasses = null;
-        }
-        resetTR(Collections.emptyList());
+        remapper.removeInput();
     }
     
     @Override

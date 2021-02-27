@@ -24,7 +24,6 @@
 package me.shedaniel.architectury.transformer.handler;
 
 import me.shedaniel.architectury.transformer.Transformer;
-import me.shedaniel.architectury.transformer.input.OpenedOutputInterface;
 import me.shedaniel.architectury.transformer.input.OutputInterface;
 import me.shedaniel.architectury.transformer.transformers.ClasspathProvider;
 import me.shedaniel.architectury.transformer.transformers.base.AssetEditTransformer;
@@ -34,8 +33,6 @@ import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerC
 import me.shedaniel.architectury.transformer.util.Logger;
 import me.shedaniel.architectury.transformer.util.LoggerFilter;
 import net.fabricmc.tinyremapper.IMappingProvider;
-import net.fabricmc.tinyremapper.NonClassCopyMode;
-import net.fabricmc.tinyremapper.OutputConsumerPath;
 import net.fabricmc.tinyremapper.TinyRemapper;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -43,9 +40,8 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -119,29 +115,27 @@ public class SimpleTransformerHandler implements TransformHandler {
     private void remapTR(List<IMappingProvider> mappingProviders, String input, OutputInterface output) throws Exception {
         TinyRemapper remapper = getRemapper(mappingProviders);
         
-        Path inputTmp = copyClassesToTmpJar(output);
-        Path outputTmp = Files.createTempFile(null, ".jar");
-        inputTmp.toFile().deleteOnExit();
-        outputTmp.toFile().deleteOnExit();
-        Files.deleteIfExists(outputTmp);
-        
         LoggerFilter.replaceSystemOut();
-        try (OutputConsumerPath outputConsumer = new OutputConsumerPath.Builder(outputTmp).build()) {
-            outputConsumer.addNonClassFiles(inputTmp, NonClassCopyMode.UNCHANGED, null);
-            remapper.readInputs(inputTmp);
-            remapper.apply(outputConsumer);
+        try {
+            List<byte[]> classes = new ArrayList<>();
+            output.handle((path, bytes) -> {
+                if (path.endsWith(".class")) {
+                    classes.add(bytes);
+                }
+            });
+            remapper.readInputs(classes.toArray(new byte[][]{}));
+            remapper.apply((path, bytes) -> {
+                try {
+                    output.addClass(path, bytes);
+                } catch (IOException exception) {
+                    throw new UncheckedIOException(exception);
+                }
+            });
             debugRemapper(remapper);
         } catch (Exception e) {
             throw new RuntimeException("Failed to remap " + input + " to " + output, e);
         } finally {
-            try (OpenedOutputInterface outputTmpInterface = OpenedOutputInterface.ofJar(outputTmp)) {
-                outputTmpInterface.copyTo(output);
-            } finally {
-                closeRemapper(remapper);
-                
-                Files.deleteIfExists(inputTmp);
-                Files.deleteIfExists(outputTmp);
-            }
+            closeRemapper(remapper);
         }
     }
     
@@ -152,16 +146,6 @@ public class SimpleTransformerHandler implements TransformHandler {
         ((Map<String, String>) classMapField.get(remapper)).forEach((from, to) -> {
             Logger.debug(from + " -> " + to);
         });
-    }
-    
-    private static Path copyClassesToTmpJar(OutputInterface output) throws IOException {
-        Path tmpJar = Files.createTempFile(null, ".jar");
-        Files.deleteIfExists(tmpJar);
-        tmpJar.toFile().deleteOnExit();
-        try (OpenedOutputInterface outputInterface = OpenedOutputInterface.ofJar(tmpJar)) {
-            output.copyTo(path -> path.endsWith(".class"), outputInterface);
-        }
-        return tmpJar;
     }
     
     protected TinyRemapper getRemapper(List<IMappingProvider> providers) throws Exception {

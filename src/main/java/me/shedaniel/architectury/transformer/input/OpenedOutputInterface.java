@@ -27,12 +27,15 @@ import me.shedaniel.architectury.transformer.util.ClosableChecker;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 public class OpenedOutputInterface extends ClosableChecker implements OutputInterface {
     private final Provider provider;
+    private Lock lock = new ReentrantLock();
     private OutputInterface outputInterface;
     
     protected OpenedOutputInterface(Provider provider) {
@@ -59,11 +62,16 @@ public class OpenedOutputInterface extends ClosableChecker implements OutputInte
     private OutputInterface getParent() throws IOException {
         validateCloseState();
         
-        if (outputInterface == null || outputInterface.isClosed()) {
-            return outputInterface = provider.provide();
+        try {
+            lock.lock();
+            if (outputInterface == null || outputInterface.isClosed()) {
+                return outputInterface = provider.provide();
+            }
+            
+            return outputInterface;
+        } finally {
+            lock.unlock();
         }
-        
-        return outputInterface;
     }
     
     @Override
