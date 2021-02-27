@@ -44,7 +44,7 @@ public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHan
     
     private void prepare() throws Exception {
         Logger.debug("Preparing tiny remapper prepared transformer: " + getClass().getName());
-        remapper = TinyRemapper.newRemapper().build();
+        remapper = TinyRemapper.newRemapper().skipConflictsChecking(true).build();
         
         remapper.readClassPath(classpath.provide());
     }

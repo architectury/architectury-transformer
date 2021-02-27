@@ -169,6 +169,7 @@ public class SimpleTransformerHandler implements TransformHandler {
         for (IMappingProvider provider : providers) {
             builder.withMappings(provider);
         }
+        builder.skipConflictsChecking(true);
         TinyRemapper remapper = builder.build();
         
         remapper.readClassPath(classpath.provide());
