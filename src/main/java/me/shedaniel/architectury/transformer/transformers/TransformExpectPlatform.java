@@ -42,6 +42,7 @@ import java.io.InputStream;
 import java.lang.invoke.CallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.util.ArrayList;
 import java.util.Objects;
 
 public class TransformExpectPlatform implements AssetEditTransformer, ClassEditTransformer {
@@ -154,6 +155,7 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
                     method.maxStack = -1;
 
                     // Add @ExpectPlatform.Transformed as a marker annotation
+                    if (method.invisibleAnnotations == null) method.invisibleAnnotations = new ArrayList<>();
                     method.invisibleAnnotations.add(new AnnotationNode(RemapInjectables.expectPlatformTransformed));
                 }
             }
