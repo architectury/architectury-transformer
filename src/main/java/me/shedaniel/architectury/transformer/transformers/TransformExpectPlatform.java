@@ -152,6 +152,9 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
                     int i = returnValue.chars().filter(it -> it != '[').findFirst().getAsInt();
                     addReturn(method.instructions, (char) i);
                     method.maxStack = -1;
+
+                    // Add @ExpectPlatform.Transformed as a marker annotation
+                    method.invisibleAnnotations.add(new AnnotationNode(RemapInjectables.expectPlatformTransformed));
                 }
             }
         }

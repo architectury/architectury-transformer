@@ -36,7 +36,8 @@ import java.util.List;
 public class RemapInjectables implements TinyRemapperTransformer {
     public static final String expectPlatform = "Lme/shedaniel/architectury/ExpectPlatform;";
     public static final String expectPlatformNew = "Lme/shedaniel/architectury/annotations/ExpectPlatform;";
-    
+    public static final String expectPlatformTransformed = "Lme/shedaniel/architectury/annotations/ExpectPlatform$Transformed;";
+
     @Override
     public List<IMappingProvider> collectMappings() throws Exception {
         if (isInjectInjectables()) {
