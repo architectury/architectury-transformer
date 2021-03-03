@@ -25,6 +25,7 @@ package me.shedaniel.architectury.transformer.handler;
 
 import me.shedaniel.architectury.transformer.transformers.ClasspathProvider;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
+import me.shedaniel.architectury.transformer.transformers.classpath.ReadClasspathProvider;
 import me.shedaniel.architectury.transformer.util.Logger;
 import net.fabricmc.tinyremapper.IMappingProvider;
 import net.fabricmc.tinyremapper.TinyRemapper;
@@ -35,14 +36,18 @@ import java.util.Set;
 public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHandler {
     private TinyRemapper remapper;
     
-    public TinyRemapperPreparedTransformerHandler(ClasspathProvider classpath, TransformerContext context) throws Exception {
+    public TinyRemapperPreparedTransformerHandler(ReadClasspathProvider classpath, TransformerContext context) throws Exception {
         super(classpath, context);
         prepare();
     }
     
     private void prepare() throws Exception {
         Logger.debug("Preparing tiny remapper prepared transformer: " + getClass().getName());
-        remapper = TinyRemapper.newRemapper().skipConflictsChecking(true).cacheMappings(true).build();
+        remapper = TinyRemapper.newRemapper()
+                .skipConflictsChecking(true)
+                .cacheMappings(true)
+                .threads(Runtime.getRuntime().availableProcessors())
+                .build();
         
         remapper.readClassPath(classpath.provide());
         remapper.prepareClasses();

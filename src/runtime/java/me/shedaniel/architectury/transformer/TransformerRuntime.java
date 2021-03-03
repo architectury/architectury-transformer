@@ -31,13 +31,17 @@ import me.shedaniel.architectury.transformer.input.*;
 import me.shedaniel.architectury.transformer.transformers.BuiltinProperties;
 import me.shedaniel.architectury.transformer.transformers.ClasspathProvider;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
+import me.shedaniel.architectury.transformer.transformers.classpath.ReadClasspathProvider;
 import me.shedaniel.architectury.transformer.util.Logger;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.instrument.*;
+import java.lang.instrument.ClassDefinition;
+import java.lang.instrument.ClassFileTransformer;
+import java.lang.instrument.IllegalClassFormatException;
+import java.lang.instrument.Instrumentation;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -68,6 +72,7 @@ public class TransformerRuntime {
     public static final String PROPERTIES = "architectury.properties";
     public static final Set<File> TRANSFORM_FILES = new HashSet<>();
     public static final Map<String, Map.Entry<List<Transformer>, DirectoryOutputInterface>> CLASSES_TO_TRANSFORM = new HashMap<>();
+    private static ReadClasspathProvider classpathProvider;
     
     private static boolean isDebugOutputEnabled() {
         return System.getProperty(BuiltinProperties.DEBUG_OUTPUT, "false").equals("true");
@@ -80,8 +85,6 @@ public class TransformerRuntime {
         Properties properties = new Properties();
         properties.load(new ByteArrayInputStream(Files.readAllBytes(propertiesPath)));
         properties.forEach((o, o2) -> System.setProperty((String) o, (String) o2));
-        
-        doInstrumentationStuff();
         
         // We start our journey of achieving hell
         Path configPath = Paths.get(System.getProperty(RUNTIME_TRANSFORM_CONFIG));
@@ -126,6 +129,16 @@ public class TransformerRuntime {
             }
         }
         List<Path> tmpJars = new ArrayList<>();
+        classpathProvider = ReadClasspathProvider.of(ClasspathProvider.fromProperties().filter(path -> {
+            File file = path.toFile().getAbsoluteFile();
+            for (Path path1 : toTransform.keySet()) {
+                if (Objects.equals(path1.toFile().getAbsoluteFile(), file)) {
+                    return false;
+                }
+            }
+            return true;
+        }));
+        doInstrumentationStuff();
         for (Map.Entry<Path, List<Transformer>> entry : toTransform.entrySet()) {
             DirectoryOutputInterface debugOut = debugOuts.get(entry.getKey());
             Path tmpJar = Files.createTempFile(null, ".jar");
@@ -159,9 +172,7 @@ public class TransformerRuntime {
                         public boolean canAddClasses() {
                             return true;
                         }
-                    }, ClasspathProvider.fromProperties().filter(path -> {
-                        return !Objects.equals(entry.getKey().toFile().getAbsoluteFile(), path.toFile().getAbsoluteFile());
-                    }), entry.getKey().toString(), new AbstractOutputInterface(inputInterface) {
+                    }, classpathProvider, entry.getKey().toString(), new AbstractOutputInterface(inputInterface) {
                         @Override
                         public boolean addFile(String path, byte[] bytes) throws IOException {
                             String s = stripLeadingSlash.apply(path);
@@ -178,12 +189,12 @@ public class TransformerRuntime {
                             
                             return bytes;
                         }
-    
+                        
                         @Override
                         public String toString() {
                             return outputInterface.toString();
                         }
-    
+                        
                         @Override
                         public void close() throws IOException {
                             
@@ -224,9 +235,7 @@ public class TransformerRuntime {
                             public boolean canAddClasses() {
                                 return false;
                             }
-                        }, ClasspathProvider.fromProperties().filter(classpathPath -> {
-                            return !Objects.equals(entry.getKey().toFile().getAbsoluteFile(), classpathPath.toFile().getAbsoluteFile());
-                        }), entry.getKey().toString(), new AbstractOutputInterface(inputInterface) {
+                        }, classpathProvider, entry.getKey().toString(), new AbstractOutputInterface(inputInterface) {
                             @Override
                             public boolean addFile(String path, byte[] bytes) throws IOException {
                                 String s = stripLeadingSlash.apply(path);
@@ -235,7 +244,7 @@ public class TransformerRuntime {
                                         s = s.substring(0, s.length() - 6);
                                         redefine.put(s, bytes);
                                     }
-    
+                                    
                                     return true;
                                 }
                                 return false;
@@ -259,7 +268,7 @@ public class TransformerRuntime {
                                 
                                 return bytes;
                             }
-    
+                            
                             @Override
                             public String toString() {
                                 return inputInterface.toString();
@@ -271,24 +280,28 @@ public class TransformerRuntime {
                             }
                         }, entry.getValue());
                     }
-                    redefine.forEach((s, bytes) -> {
-                        try {
-                            if (TransformerAgent.getInstrumentation().isRedefineClassesSupported()) {
-                                String name = s.replace('/', '.');
-                                Iterator<Class> iterator = Arrays.stream(TransformerAgent.getInstrumentation().getAllLoadedClasses())
-                                        .filter(a -> a.getClassLoader() != ClassLoader.getSystemClassLoader())
-                                        .filter(a -> Objects.equals(a.getName(), name))
-                                        .iterator();
-                                for (Iterator<Class> it = iterator; it.hasNext(); ) {
-                                    Class a = it.next();
-                                    Logger.info("Redefining " + s);
-                                    TransformerAgent.getInstrumentation().redefineClasses(new ClassDefinition(a, bytes));
-                                }
+                    if (TransformerAgent.getInstrumentation().isRedefineClassesSupported()) {
+                        Class[] allLoadedClasses = TransformerAgent.getInstrumentation().getAllLoadedClasses();
+                        List<ClassDefinition> definitions = new ArrayList<>();
+                        redefine.forEach((s, bytes) -> {
+                            String name = s.replace('/', '.');
+                            Iterator<Class> iterator = Arrays.stream(allLoadedClasses)
+                                    .filter(a -> a.getClassLoader() != ClassLoader.getSystemClassLoader())
+                                    .filter(a -> Objects.equals(a.getName(), name))
+                                    .iterator();
+                            for (Iterator<Class> it = iterator; it.hasNext(); ) {
+                                Class a = it.next();
+                                if (a.getClassLoader() == ClassLoader.getSystemClassLoader()) continue;
+                                Logger.debug("Redefining " + s);
+                                definitions.add(new ClassDefinition(a, bytes));
                             }
-                        } catch (ClassNotFoundException | UnmodifiableClassException e) {
-                            e.printStackTrace();
+                        });
+                        if (!definitions.isEmpty()) {
+                            Transform.logTime(() -> {
+                                TransformerAgent.getInstrumentation().redefineClasses(definitions.toArray(new ClassDefinition[0]));
+                            }, "Redefined " + definitions.size() + " class(es)");
                         }
-                    });
+                    }
                 } catch (Exception exception) {
                     exception.printStackTrace();
                 }
@@ -311,9 +324,6 @@ public class TransformerRuntime {
         boolean prepare = true;
         TransformHandler handler;
         try {
-            ClasspathProvider classpath = ClasspathProvider.fromProperties().filter(path -> {
-                return !TRANSFORM_FILES.contains(path.toFile().getAbsoluteFile());
-            });
             TransformerContext context = new TransformerContext() {
                 @Override
                 public void appendArgument(String... args) {
@@ -335,9 +345,9 @@ public class TransformerRuntime {
                 }
             };
             if (prepare) {
-                handler = new TinyRemapperPreparedTransformerHandler(classpath, context).asThreadLocked();
+                handler = new TinyRemapperPreparedTransformerHandler(classpathProvider, context).asThreadLocked();
             } else {
-                handler = new SimpleTransformerHandler(classpath, context).asThreadLocked();
+                handler = new SimpleTransformerHandler(classpathProvider, context).asThreadLocked();
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -358,12 +368,12 @@ public class TransformerRuntime {
                                 public boolean isClosed() {
                                     return false;
                                 }
-    
+                                
                                 @Override
                                 public void handle(Consumer<String> action) throws IOException {
                                     action.accept(className + ".class");
                                 }
-    
+                                
                                 @Override
                                 public void handle(BiConsumer<String, byte[]> action) throws IOException {
                                     action.accept(className + ".class", classBytes.get());
@@ -388,7 +398,7 @@ public class TransformerRuntime {
                                     
                                     return null;
                                 }
-    
+                                
                                 @Override
                                 public String toString() {
                                     return className + ".class";

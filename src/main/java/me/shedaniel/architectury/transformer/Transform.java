@@ -30,6 +30,7 @@ import me.shedaniel.architectury.transformer.input.OutputInterface;
 import me.shedaniel.architectury.transformer.transformers.BuiltinProperties;
 import me.shedaniel.architectury.transformer.transformers.ClasspathProvider;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
+import me.shedaniel.architectury.transformer.transformers.classpath.ReadClasspathProvider;
 import me.shedaniel.architectury.transformer.util.Logger;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -118,10 +119,20 @@ public class Transform {
     
     public static void runTransformers(TransformerContext context, ClasspathProvider classpath, InputInterface input, OutputInterface output, List<Transformer> transformers)
             throws Exception {
-        runTransformers(context, classpath, input.toString(), output, transformers);
+        runTransformers(context, ReadClasspathProvider.of(classpath), input, output, transformers);
     }
     
     public static void runTransformers(TransformerContext context, ClasspathProvider classpath, String input, OutputInterface output, List<Transformer> transformers)
+            throws Exception {
+        runTransformers(context, ReadClasspathProvider.of(classpath), input, output, transformers);
+    }
+    
+    public static void runTransformers(TransformerContext context, ReadClasspathProvider classpath, InputInterface input, OutputInterface output, List<Transformer> transformers)
+            throws Exception {
+        runTransformers(context, classpath, input.toString(), output, transformers);
+    }
+    
+    public static void runTransformers(TransformerContext context, ReadClasspathProvider classpath, String input, OutputInterface output, List<Transformer> transformers)
             throws Exception {
         try (SimpleTransformerHandler handler = new SimpleTransformerHandler(classpath, context)) {
             handler.handle(input, output, transformers);

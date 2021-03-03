@@ -30,6 +30,7 @@ import me.shedaniel.architectury.transformer.transformers.base.AssetEditTransfor
 import me.shedaniel.architectury.transformer.transformers.base.ClassEditTransformer;
 import me.shedaniel.architectury.transformer.transformers.base.TinyRemapperTransformer;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
+import me.shedaniel.architectury.transformer.transformers.classpath.ReadClasspathProvider;
 import me.shedaniel.architectury.transformer.util.Logger;
 import me.shedaniel.architectury.transformer.util.LoggerFilter;
 import net.fabricmc.tinyremapper.IMappingProvider;
@@ -47,12 +48,12 @@ import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 public class SimpleTransformerHandler implements TransformHandler {
-    protected ClasspathProvider classpath;
+    protected ReadClasspathProvider classpath;
     protected TransformerContext context;
     protected boolean closed = false;
     
-    public SimpleTransformerHandler(ClasspathProvider classpath, TransformerContext context) throws Exception {
-        this.classpath = classpath.logging();
+    public SimpleTransformerHandler(ReadClasspathProvider classpath, TransformerContext context) throws Exception {
+        this.classpath = classpath;
         this.context = context;
     }
     
@@ -148,6 +149,7 @@ public class SimpleTransformerHandler implements TransformHandler {
     
     protected TinyRemapper getRemapper(Set<IMappingProvider> providers) throws Exception {
         TinyRemapper.Builder builder = TinyRemapper.newRemapper();
+        builder.threads(Runtime.getRuntime().availableProcessors());
         for (IMappingProvider provider : providers) {
             builder.withMappings(provider);
         }
