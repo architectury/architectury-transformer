@@ -76,6 +76,10 @@ public class ReadClasspathProviderImpl implements ReadClasspathProvider {
                         List<byte[]> bytes = future.get(60, TimeUnit.SECONDS);
                         classpaths = bytes.toArray(new byte[0][0]);
                         threadPool.awaitTermination(0, TimeUnit.SECONDS);
+    
+                        for (FileSystem system : fsToClose) {
+                            FileSystemHandler.close(system);
+                        }
                     }, "Read classpath");
                 } catch (Exception e) {
                     throw new RuntimeException(e);

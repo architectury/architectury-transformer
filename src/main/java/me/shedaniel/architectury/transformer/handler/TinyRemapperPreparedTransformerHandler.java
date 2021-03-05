@@ -46,6 +46,8 @@ public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHan
         remapper = TinyRemapper.newRemapper()
                 .skipConflictsChecking(true)
                 .cacheMappings(true)
+                .skipPropagate(true)
+                .logger(Logger::info)
                 .threads(Runtime.getRuntime().availableProcessors())
                 .build();
         
