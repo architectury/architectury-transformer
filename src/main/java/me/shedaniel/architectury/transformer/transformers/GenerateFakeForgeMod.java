@@ -39,7 +39,7 @@ public class GenerateFakeForgeMod extends AbstractFakeMod {
         String fakeModId = generateModId();
         output.addFile("META-INF/mods.toml",
                 "modLoader = \"javafml\"\n" +
-                "loaderVersion = \"[33,)\"\n" +
+                "loaderVersion = \"[1,)\"\n" +
                 "license = \"Generated\"\n" +
                 "[[mods]]\n" +
                 "modId = \"" + fakeModId + "\"\n");
