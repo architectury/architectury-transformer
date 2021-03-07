@@ -25,7 +25,7 @@ sourceCompatibility = targetCompatibility = 1.8
 repositories {
     maven { url "https://maven.shedaniel.me/" }
     maven { url "https://maven.fabricmc.net/" }
-    gradlePluginPortal()
+    mavenCentral()
 }
 
 sourceSets {
@@ -60,6 +60,8 @@ dependencies {
     implementation "com.google.guava:guava:29.0-jre"
     implementation "org.zeroturnaround:zt-zip:1.13"
     implementation "com.google.code.gson:gson:2.8.5"
+    implementation "me.shedaniel.architectury:refmap-remapper:1.0.2"
+    compileOnly "org.jetbrains:annotations:20.1.0"
 }
 
 task annotationsInjectJar(type: Jar) {
@@ -124,7 +126,8 @@ shadowJar {
     relocate "org.slf4j", "me.shedaniel.architectury.transformer.shadowed.impl.org.slf4j"
     relocate "com.google", "me.shedaniel.architectury.transformer.shadowed.impl.com.google"
     relocate "javax.annotation", "me.shedaniel.architectury.transformer.shadowed.impl.javax.annotation"
-    configurations = [project.configurations.compileClasspath]
+    relocate "me.shedaniel.architectury.refmapremapper", "me.shedaniel.architectury.transformer.shadowed.impl.me.shedaniel.architectury.refmapremapper"
+    configurations = [project.configurations.runtimeClasspath]
     classifier "shadow"
 }
 

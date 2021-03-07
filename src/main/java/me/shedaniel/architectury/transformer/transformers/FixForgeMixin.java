@@ -23,15 +23,20 @@
 
 package me.shedaniel.architectury.transformer.transformers;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import me.shedaniel.architectury.refmapremapper.RefmapRemapper;
+import me.shedaniel.architectury.refmapremapper.remapper.MappingsRemapper;
+import me.shedaniel.architectury.refmapremapper.remapper.Remapper;
+import me.shedaniel.architectury.refmapremapper.remapper.SimpleReferenceRemapper;
 import me.shedaniel.architectury.transformer.Transform;
 import me.shedaniel.architectury.transformer.input.OutputInterface;
 import me.shedaniel.architectury.transformer.transformers.base.AssetEditTransformer;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
 import me.shedaniel.architectury.transformer.util.Logger;
-import net.fabricmc.mapping.tree.ClassDef;
-import net.fabricmc.mapping.tree.TinyMappingFactory;
-import net.fabricmc.mapping.tree.TinyTree;
+import net.fabricmc.mapping.tree.*;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -39,16 +44,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.function.UnaryOperator;
 import java.util.jar.Manifest;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Adds mixins to the MixinConfigs field in the manifest, and remap intermediary refmap to srg.
  */
 public class FixForgeMixin implements AssetEditTransformer {
     private TinyTree srg;
+    private Map<String, Mapped> srgMap;
     
     @Override
     public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
@@ -100,24 +103,67 @@ public class FixForgeMixin implements AssetEditTransformer {
             Logger.debug("Remapping refmap from intermediary to srg: " + refmap);
             output.modifyFile(refmap, bytes -> {
                 try {
-                    JsonObject refmapElement = new JsonParser().parse(new InputStreamReader(new ByteArrayInputStream(bytes))).getAsJsonObject().deepCopy();
-                    if (refmapElement.has("mappings")) {
-                        for (Map.Entry<String, JsonElement> entry : refmapElement.get("mappings").getAsJsonObject().entrySet()) {
-                            remapRefmap(entry.getValue().getAsJsonObject());
+                    readSrg();
+                    
+                    SimpleReferenceRemapper referenceRemapper = new SimpleReferenceRemapper(new SimpleReferenceRemapper.Remapper() {
+                        @Override
+                        @Nullable
+                        public String mapClass(String value) {
+                            Mapped classDef = srgMap.get(value);
+                            return classDef == null ? null : classDef.getName("srg");
                         }
-                    }
-                    if (refmapElement.has("data")) {
-                        JsonObject data = refmapElement.get("data").getAsJsonObject();
-                        if (data.has("named:intermediary")) {
-                            JsonObject copy = data.get("named:intermediary").getAsJsonObject().deepCopy();
-                            for (Map.Entry<String, JsonElement> entry : copy.entrySet()) {
-                                remapRefmap(entry.getValue().getAsJsonObject());
+                        
+                        @Override
+                        @Nullable
+                        public String mapMethod(@Nullable String className, String methodName, String methodDescriptor) {
+                            String methodId = "M " + methodName + " " + methodDescriptor;
+                            Mapped mapped;
+                            if (className != null) {
+                                mapped = srgMap.get(className + " " + methodId);
+                                if (mapped != null) return mapped.getName("srg");
                             }
-                            data.add("searge", copy);
-                            data.remove("named:intermediary");
+                            mapped = srgMap.get(methodId);
+                            return mapped == null ? null : mapped.getName("srg");
                         }
-                    }
-                    return gson.toJson(refmapElement).getBytes(StandardCharsets.UTF_8);
+                        
+                        @Override
+                        @Nullable
+                        public String mapField(@Nullable String className, String fieldName, String fieldDescriptor) {
+                            String fieldId = "F " + fieldName + " " + fieldDescriptor;
+                            Mapped mapped;
+                            if (className != null) {
+                                mapped = srgMap.get(className + " " + fieldId);
+                                if (mapped != null) return mapped.getName("srg");
+                            }
+                            mapped = srgMap.get(fieldId);
+                            return mapped == null ? null : mapped.getName("srg");
+                        }
+                    }) {
+                        @Override
+                        public String remapSimple(String key, String value) {
+                            String remapped = super.remapSimple(key, value);
+                            Logger.debug("Remapped refmap value " + value + " -> " + remapped);
+                            return remapped;
+                        }
+                    };
+                    
+                    return RefmapRemapper.remap(new Remapper() {
+                        @Override
+                        @Nullable
+                        public MappingsRemapper remapMappings() {
+                            return className -> referenceRemapper;
+                        }
+                        
+                        @Override
+                        @Nullable
+                        public Map.Entry<String, @Nullable MappingsRemapper> remapMappingsData(String data) {
+                            if (Objects.equals(data, "named:intermediary")) {
+                                return new AbstractMap.SimpleEntry<>("searge", remapMappings());
+                            }
+                            
+                            return null;
+                        }
+                    }, new String(bytes, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -125,17 +171,7 @@ public class FixForgeMixin implements AssetEditTransformer {
         }
     }
     
-    private String replaceFirst(String full, String toReplace, String replacement) {
-        int index = full.indexOf(toReplace);
-        if (index == -1) return full;
-        StringBuilder builder = new StringBuilder();
-        builder.append(full, 0, index);
-        builder.append(replacement);
-        builder.append(full, index + toReplace.length(), full.length());
-        return builder.toString();
-    }
-    
-    private void remapRefmap(JsonObject obj) throws IOException {
+    private void readSrg() throws IOException {
         if (srg == null) {
             Path srgMappingsPath = Paths.get(System.getProperty(BuiltinProperties.MAPPINGS_WITH_SRG));
             try (BufferedReader reader = Files.newBufferedReader(srgMappingsPath)) {
@@ -143,134 +179,30 @@ public class FixForgeMixin implements AssetEditTransformer {
             }
         }
         
-        Pattern methodPattern = Pattern.compile("L(.*);(.*)(\\(.*)");
-        Pattern methodPatternWithoutClass = Pattern.compile("(.*)(\\(.*)");
-        Pattern fieldPattern = Pattern.compile("L(.*);(.*):(.*)");
-        Pattern fieldPatternWithoutClass = Pattern.compile("(.*):(.*)");
-        
-        for (String key : new HashSet<>(obj.keySet())) {
-            String originalRef = obj.get(key).getAsString();
-            String remappedRef = null;
-            
-            Matcher methodMatch = methodPattern.matcher(originalRef);
-            Matcher fieldMatch = fieldPattern.matcher(originalRef);
-            Matcher fieldMatchWithoutClass = fieldPatternWithoutClass.matcher(originalRef);
-            Matcher methodMatchWithoutClass = methodPatternWithoutClass.matcher(originalRef);
-            Optional<ClassDef> classMatch = srg.getClasses().stream().filter(it -> Objects.equals(it.getName("intermediary"), originalRef)).findFirst();
-            
-            if (methodMatch.matches()) {
-                Optional<ClassDef> matchedClass = srg.getClasses().stream().filter(it -> Objects.equals(it.getName("intermediary"), methodMatch.group(1))).findFirst();
-                String replacementName = srg.getClasses().stream()
-                        .flatMap(it -> it.getMethods().stream())
-                        .filter(it -> Objects.equals(it.getName("intermediary"), methodMatch.group(2)))
-                        .filter(it -> Objects.equals(it.getDescriptor("intermediary"), methodMatch.group(3)))
-                        .findFirst()
-                        .map(it -> it.getName("srg"))
-                        .orElse(methodMatch.group(2));
-                remappedRef = replaceFirst(originalRef, methodMatch.group(1),
-                        matchedClass.map(it -> it.getName("srg")).orElse(methodMatch.group(1)));
-                remappedRef = replaceFirst(remappedRef, methodMatch.group(2), replacementName);
-                remappedRef = replaceFirst(remappedRef, methodMatch.group(3), remapDescriptor(methodMatch.group(3),
-                        it -> srg.getClasses().stream()
-                                .filter(def -> Objects.equals(def.getName("intermediary"), it))
-                                .findFirst()
-                                .map(def -> def.getName("srg"))
-                                .orElse(it)
-                ));
-            } else if (fieldMatch.matches()) {
-                Optional<ClassDef> matchedClass = srg.getClasses().stream().filter(it -> Objects.equals(it.getName("intermediary"), fieldMatch.group(1))).findFirst();
-                String replacementName = srg.getClasses().stream()
-                        .flatMap(it -> it.getMethods().stream())
-                        .filter(it -> Objects.equals(it.getName("intermediary"), fieldMatch.group(2)))
-                        .filter(it -> Objects.equals(it.getDescriptor("intermediary"), fieldMatch.group(3)))
-                        .findFirst()
-                        .map(it -> it.getName("srg"))
-                        .orElse(fieldMatch.group(2));
-                remappedRef = replaceFirst(originalRef, fieldMatch.group(1),
-                        matchedClass.map(it -> it.getName("srg")).orElse(fieldMatch.group(1)));
-                remappedRef = replaceFirst(remappedRef, fieldMatch.group(2), replacementName);
-                remappedRef = replaceFirst(remappedRef, fieldMatch.group(3), remapDescriptor(fieldMatch.group(3),
-                        it -> srg.getClasses().stream()
-                                .filter(def -> Objects.equals(def.getName("intermediary"), it))
-                                .findFirst()
-                                .map(def -> def.getName("srg"))
-                                .orElse(it)
-                ));
-            } else if (fieldMatchWithoutClass.matches()) {
-                String replacementName = srg.getClasses().stream()
-                        .flatMap(it -> it.getFields().stream())
-                        .filter(it -> Objects.equals(it.getName("intermediary"), fieldMatchWithoutClass.group(1)))
-                        .filter(it -> Objects.equals(it.getDescriptor("intermediary"), fieldMatchWithoutClass.group(2)))
-                        .findFirst()
-                        .map(it -> it.getName("srg"))
-                        .orElse(fieldMatchWithoutClass.group(1));
-                remappedRef = replaceFirst(originalRef, fieldMatchWithoutClass.group(1), replacementName);
-                remappedRef = replaceFirst(remappedRef, fieldMatchWithoutClass.group(2), remapDescriptor(fieldMatchWithoutClass.group(2),
-                        it -> srg.getClasses().stream()
-                                .filter(def -> Objects.equals(def.getName("intermediary"), it))
-                                .findFirst()
-                                .map(def -> def.getName("srg"))
-                                .orElse(it)
-                ));
-            } else if (methodMatchWithoutClass.matches()) {
-                String replacementName = srg.getClasses().stream()
-                        .flatMap(it -> it.getMethods().stream())
-                        .filter(it -> Objects.equals(it.getName("intermediary"), methodMatchWithoutClass.group(1)))
-                        .filter(it -> Objects.equals(it.getDescriptor("intermediary"), methodMatchWithoutClass.group(2)))
-                        .findFirst()
-                        .map(it -> it.getName("srg"))
-                        .orElse(methodMatchWithoutClass.group(1));
-                remappedRef = replaceFirst(originalRef, methodMatchWithoutClass.group(1), replacementName);
-                remappedRef = replaceFirst(remappedRef, methodMatchWithoutClass.group(2), remapDescriptor(methodMatchWithoutClass.group(2),
-                        it -> srg.getClasses().stream()
-                                .filter(def -> Objects.equals(def.getName("intermediary"), it))
-                                .findFirst()
-                                .map(def -> def.getName("srg"))
-                                .orElse(it)
-                ));
-            } else if (classMatch.isPresent()) {
-                remappedRef = classMatch.get().getName("srg");
-            }
-            
-            if (remappedRef == null) {
-                Logger.error("Failed to remap refmap value: " + originalRef);
-            } else {
-                obj.addProperty(key, remappedRef);
-                Logger.debug("Remapped refmap value: " + originalRef + " -> " + remappedRef);
-            }
-        }
-    }
-    
-    private String remapDescriptor(String self, UnaryOperator<String> classMappings) {
-        try {
-            StringReader reader = new StringReader(self);
-            StringBuilder result = new StringBuilder();
-            boolean insideClassName = false;
-            StringBuilder className = new StringBuilder();
-            while (true) {
-                int c = reader.read();
-                if (c == -1) {
-                    break;
+        if (srgMap == null) {
+            srgMap = new HashMap<>();
+            for (ClassDef srgClass : srg.getClasses()) {
+                String intermediary = srgClass.getName("intermediary");
+                srgMap.put(intermediary, srgClass);
+                
+                for (MethodDef method : srgClass.getMethods()) {
+                    String methodId = "M " + method.getName("intermediary") + " " + method.getDescriptor("intermediary");
+                    srgMap.put(intermediary + " " + methodId, method);
+                    
+                    if (!srgMap.containsKey(methodId)) {
+                        srgMap.put(methodId, method);
+                    }
                 }
-                if (c == (int) ';') {
-                    insideClassName = false;
-                    result.append(classMappings.apply(className.toString()));
-                }
-                if (insideClassName) {
-                    className.append((char) c);
-                } else {
-                    result.append((char) c);
-                }
-                if (!insideClassName && c == (int) 'L') {
-                    insideClassName = true;
-                    className.setLength(0);
+                
+                for (FieldDef field : srgClass.getFields()) {
+                    String fieldId = "F " + field.getName("intermediary") + " " + field.getDescriptor("intermediary");
+                    srgMap.put(intermediary + " " + fieldId, field);
+                    
+                    if (!srgMap.containsKey(fieldId)) {
+                        srgMap.put(fieldId, field);
+                    }
                 }
             }
-            String resultString = result.toString();
-            Logger.debug("Remapped descriptor: %s -> %s", self, resultString);
-            return resultString;
-        } catch (IOException e) {
-            throw new AssertionError(e);
         }
     }
 }
