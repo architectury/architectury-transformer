@@ -60,7 +60,7 @@ dependencies {
     implementation "com.google.guava:guava:29.0-jre"
     implementation "org.zeroturnaround:zt-zip:1.13"
     implementation "com.google.code.gson:gson:2.8.5"
-    implementation "me.shedaniel.architectury:refmap-remapper:1.0.2"
+    implementation "me.shedaniel.architectury:refmap-remapper:1.0.3"
     compileOnly "org.jetbrains:annotations:20.1.0"
 }
 
