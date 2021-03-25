@@ -23,6 +23,7 @@
 
 package me.shedaniel.architectury.transformer;
 
+import com.google.common.hash.Hashing;
 import me.shedaniel.architectury.transformer.agent.TransformerAgent;
 import me.shedaniel.architectury.transformer.handler.SimpleTransformerHandler;
 import me.shedaniel.architectury.transformer.handler.TinyRemapperPreparedTransformerHandler;
@@ -140,6 +141,7 @@ public class TransformerRuntime {
         }));
         doInstrumentationStuff();
         for (Map.Entry<Path, List<Transformer>> entry : toTransform.entrySet()) {
+            Map<String, String> classRedefineCache = new HashMap<>();
             DirectoryOutputInterface debugOut = debugOuts.get(entry.getKey());
             Path tmpJar = Files.createTempFile(null, ".jar");
             tmpJars.add(tmpJar);
@@ -176,6 +178,9 @@ public class TransformerRuntime {
                         @Override
                         public boolean addFile(String path, byte[] bytes) throws IOException {
                             String s = stripLeadingSlash.apply(path);
+                            if (s.endsWith(".class")) {
+                                classRedefineCache.put(s.substring(0, s.length() - 6), Hashing.sha256().hashBytes(bytes).toString());
+                            }
                             return outputInterface.addFile(s, bytes) && (debugOut == null || debugOut.addFile(s, bytes));
                         }
                         
@@ -242,7 +247,11 @@ public class TransformerRuntime {
                                 if (outputInterface.addFile(s, bytes) && (debugOut == null || debugOut.addFile(s, bytes))) {
                                     if (path.endsWith(".class")) {
                                         s = s.substring(0, s.length() - 6);
-                                        redefine.put(s, bytes);
+                                        String sha256 = Hashing.sha256().hashBytes(bytes).toString();
+                                        if (!Objects.equals(classRedefineCache.get(s), sha256)) {
+                                            classRedefineCache.put(s, sha256);
+                                            redefine.put(s, bytes);
+                                        }
                                     }
                                     
                                     return true;
@@ -262,7 +271,11 @@ public class TransformerRuntime {
                                     if (path.endsWith(".class")) {
                                         String s = stripLeadingSlash.apply(path);
                                         s = s.substring(0, s.length() - 6);
-                                        redefine.put(s, bytes);
+                                        String sha256 = Hashing.sha256().hashBytes(bytes).toString();
+                                        if (!Objects.equals(classRedefineCache.get(s), sha256)) {
+                                            classRedefineCache.put(s, sha256);
+                                            redefine.put(s, bytes);
+                                        }
                                     }
                                 }
                                 
