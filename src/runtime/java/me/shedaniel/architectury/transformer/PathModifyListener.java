@@ -37,6 +37,7 @@ public class PathModifyListener extends Thread {
     public PathModifyListener(Path path, Consumer<Path> listener) {
         this.path = path;
         this.listener = listener;
+        setDaemon(true);
         start();
     }
     
