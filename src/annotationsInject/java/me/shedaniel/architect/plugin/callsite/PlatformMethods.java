@@ -40,17 +40,17 @@ public class PlatformMethods {
         try {
             newClass = Class.forName(platformExpectedClass, false, lookupClass.getClassLoader());
         } catch (ClassNotFoundException exception) {
-            throw new PlatformExpectedError(lookupClass.getName() + "#" + name + " expected platform implementation in " + platformExpectedClass +
+            throw new AssertionError(lookupClass.getName() + "#" + name + " expected platform implementation in " + platformExpectedClass +
                     "#" + name + ", but the class doesn't exist!", exception);
         }
         MethodHandle platformMethod;
         try {
             platformMethod = lookup.findStatic(newClass, name, type);
         } catch (NoSuchMethodException exception) {
-            throw new PlatformExpectedError(lookupClass.getName() + "#" + name + " expected platform implementation in " + platformExpectedClass +
+            throw new AssertionError(lookupClass.getName() + "#" + name + " expected platform implementation in " + platformExpectedClass +
                     "#" + name + ", but the method doesn't exist!", exception);
         } catch (IllegalAccessException exception) {
-            throw new PlatformExpectedError(lookupClass.getName() + "#" + name + " expected platform implementation in " + platformExpectedClass +
+            throw new AssertionError(lookupClass.getName() + "#" + name + " expected platform implementation in " + platformExpectedClass +
                     "#" + name + ", but the method's modifier doesn't match the access requirements!", exception);
         }
         return new ConstantCallSite(platformMethod);
@@ -67,6 +67,7 @@ public class PlatformMethods {
                 HashMap<String, String> MOD_LOADERS = new HashMap<>();
                 MOD_LOADERS.put("net.fabricmc.loader.FabricLoader", "fabric");
                 MOD_LOADERS.put("net.minecraftforge.fml.common.Mod", "forge");
+                MOD_LOADERS.put("org.quiltmc.loader.impl.QuiltLoaderImpl", "fabric");
                 for (Map.Entry<String, String> entry : MOD_LOADERS.entrySet()) {
                     try {
                         PlatformMethods.class.getClassLoader().loadClass(entry.getKey());
