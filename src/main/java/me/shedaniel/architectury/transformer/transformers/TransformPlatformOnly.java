@@ -24,6 +24,7 @@
 package me.shedaniel.architectury.transformer.transformers;
 
 import me.shedaniel.architectury.transformer.transformers.base.ClassEditTransformer;
+import me.shedaniel.architectury.transformer.util.Logger;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -36,6 +37,10 @@ public class TransformPlatformOnly implements ClassEditTransformer {
     @Override
     public ClassNode doEdit(String name, ClassNode node) {
         String platform = System.getProperty(BuiltinProperties.PLATFORM_NAME);
+        if (platform == null) {
+            Logger.debug("Skipping TransformPlatformOnly because BuiltinProperties.PLATFORM_NAME is not present");
+            return node;
+        }
 
         Iterator<MethodNode> iter = node.methods.iterator();
         while (iter.hasNext()) {
