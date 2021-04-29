@@ -71,7 +71,7 @@ public class PlatformMethods {
         if (modLoader == null) {
             List<String> loader = new ArrayList<>();
             HashMap<String, String> MOD_LOADERS = new HashMap<>();
-            MOD_LOADERS.put("net.fabricmc.loader.FabricLoader", "fabric");
+            MOD_LOADERS.put("net.fabricmc.loader.api.FabricLoader", "fabric");
             MOD_LOADERS.put("net.minecraftforge.fml.common.Mod", "forge");
             for (Map.Entry<String, String> entry : MOD_LOADERS.entrySet()) {
                 try {
