@@ -35,15 +35,7 @@ public class PlatformMethods {
         try {
             return forPlatform(lookup, methodName, methodType, modLoader);
         } catch (AssertionError error) {
-            if (modLoader.equals("quilt")) {
-                try {
-                    return forPlatform(lookup, methodName, methodType, "fabric");
-                } catch (AssertionError ignored) {
-                    throw error;
-                }
-            } else {
-                throw error;
-            }
+            throw error;
         }
     }
     
@@ -81,7 +73,6 @@ public class PlatformMethods {
             HashMap<String, String> MOD_LOADERS = new HashMap<>();
             MOD_LOADERS.put("net.fabricmc.loader.FabricLoader", "fabric");
             MOD_LOADERS.put("net.minecraftforge.fml.common.Mod", "forge");
-            MOD_LOADERS.put("org.quiltmc.loader.impl.QuiltLoaderImpl", "quilt");
             for (Map.Entry<String, String> entry : MOD_LOADERS.entrySet()) {
                 try {
                     PlatformMethods.class.getClassLoader().loadClass(entry.getKey());
