@@ -87,10 +87,11 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
                     
                     int stackIndex = 0;
                     for (Type argumentType : type.getArgumentTypes()) {
-                        method.instructions.add(new VarInsnNode(argumentType.getOpcode(Opcodes.ILOAD), stackIndex += argumentType.getSize()));
+                        method.instructions.add(new VarInsnNode(argumentType.getOpcode(Opcodes.ILOAD), stackIndex));
+                        stackIndex += argumentType.getSize();
                     }
                     
-                    method.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, getPlatformClass(name), method.name, method.desc));
+                    method.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, getPlatformClass(node.name), method.name, method.desc));
                     method.instructions.add(new InsnNode(type.getReturnType().getOpcode(Opcodes.IRETURN)));
                     
                     method.maxStack = -1;
@@ -110,7 +111,7 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
         Preconditions.checkNotNull(platform, BuiltinProperties.PLATFORM_NAME + " is not present!");
         String lookupType = lookupClass.replace("$", "") + "Impl";
         
-        return lookupType.substring(0, lookupType.lastIndexOf('.')) + "." + platform + "." +
-               lookupType.substring(lookupType.lastIndexOf('.') + 1);
+        return lookupType.substring(0, lookupType.lastIndexOf('/')) + "/" + platform + "/" +
+               lookupType.substring(lookupType.lastIndexOf('/') + 1);
     }
 }
