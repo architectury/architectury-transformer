@@ -23,79 +23,58 @@
 
 package me.shedaniel.architectury.transformer.transformers;
 
+import com.google.common.base.Preconditions;
 import me.shedaniel.architectury.transformer.input.OutputInterface;
 import me.shedaniel.architectury.transformer.transformers.base.AssetEditTransformer;
 import me.shedaniel.architectury.transformer.transformers.base.ClassEditTransformer;
 import me.shedaniel.architectury.transformer.transformers.base.edit.TransformerContext;
 import me.shedaniel.architectury.transformer.util.Logger;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Handle;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.commons.ClassRemapper;
-import org.objectweb.asm.commons.Remapper;
+import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
-import org.zeroturnaround.zip.ZipUtil;
-import org.zeroturnaround.zip.commons.IOUtils;
 
-import java.io.InputStream;
-import java.lang.invoke.CallSite;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.util.ArrayList;
 import java.util.Objects;
 
 public class TransformExpectPlatform implements AssetEditTransformer, ClassEditTransformer {
     @Override
     public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
-        if (RemapInjectables.isInjectInjectables() && context.canAddClasses()) {
-            try (InputStream stream = TransformExpectPlatform.class.getResourceAsStream("/annotations-inject/injection.jar")) {
-                ZipUtil.iterate(stream, (input, entry) -> {
-                    if (entry.getName().endsWith(".class")) {
-                        String s = entry.getName();
-                        if (s.endsWith(".class")) {
-                            s = s.substring(0, s.length() - 6);
-                        }
-                        if (s.indexOf('/') >= 0) {
-                            s = s.substring(s.lastIndexOf('/') + 1);
-                        }
-                        
-                        String newName = RemapInjectables.getUniqueIdentifier() + "/" + s;
-                        ClassNode node = new ClassNode(Opcodes.ASM8);
-                        
-                        new ClassReader(IOUtils.toByteArray(input)).accept(node, ClassReader.EXPAND_FRAMES);
-                        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-                        ClassRemapper remapper = new ClassRemapper(writer, new Remapper() {
-                            @Override
-                            public String map(String internalName) {
-                                if (internalName != null && internalName.startsWith("me/shedaniel/architect/plugin/callsite")) {
-                                    return internalName.replace("me/shedaniel/architect/plugin/callsite", RemapInjectables.getUniqueIdentifier());
-                                }
-                                return super.map(internalName);
-                            }
-                        });
-                        node.name = newName;
-                        node.accept(remapper);
-                        
-                        try {
-                            output.addClass(newName, writer.toByteArray());
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                });
-            }
+        if (!RemapInjectables.isInjectInjectables()) return;
+        String className = RemapInjectables.getUniqueIdentifier() + "/PlatformMethods";
+        output.addClass(className, buildPlatformMethodClass(className));
+    }
+    
+    private byte[] buildPlatformMethodClass(String className) {
+        /* Generates the following class:
+         * public interface PlatformMethods {
+         *   static String getModLoader() {
+         *     return platform;
+         *   }
+         * }
+         */
+        String platform = System.getProperty(BuiltinProperties.PLATFORM_NAME);
+        Preconditions.checkNotNull(platform, BuiltinProperties.PLATFORM_NAME + " is not present!");
+        
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_INTERFACE | Opcodes.ACC_ABSTRACT, className, null, "java/lang/Object", null);
+        {
+            MethodVisitor method = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "getModLoader", "()Ljava/lang/String;", null, null);
+            method.visitLdcInsn(platform);
+            method.visitInsn(Opcodes.ARETURN);
+            method.visitEnd();
         }
+        writer.visitEnd();
+        return writer.toByteArray();
     }
     
     @Override
     public ClassNode doEdit(String name, ClassNode node) {
+        if (!RemapInjectables.isInjectInjectables()) return node;
         for (MethodNode method : node.methods) {
             String platformMethodsClass = null;
             
-            if (method.visibleAnnotations != null && method.visibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.expectPlatform))) {
+            if (method.visibleAnnotations != null && method.visibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM_LEGACY))) {
                 platformMethodsClass = "me/shedaniel/architectury/PlatformMethods";
-            } else if (method.invisibleAnnotations != null && method.invisibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.expectPlatformNew))) {
+            } else if (method.invisibleAnnotations != null && method.invisibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM))) {
                 platformMethodsClass = RemapInjectables.getUniqueIdentifier() + "/PlatformMethods";
             }
             
@@ -104,59 +83,21 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
                     Logger.error("@ExpectPlatform can only apply to static methods!");
                 } else {
                     method.instructions.clear();
-                    int endOfDesc = method.desc.lastIndexOf(')');
-                    String returnValue = method.desc.substring(endOfDesc + 1);
-                    String args = method.desc.substring(1, endOfDesc);
-                    int cursor = 0;
-                    boolean inClass = false;
-                    int index = 0;
-                    while (cursor < args.length()) {
-                        char c = args.charAt(cursor);
-                        if (inClass) {
-                            if (c == ';') {
-                                addLoad(method.instructions, c, index++);
-                                inClass = false;
-                            }
-                        } else switch (c) {
-                            case '[':
-                                break;
-                            case 'L':
-                                inClass = true;
-                                break;
-                            default:
-                                int i = index++;
-                                if (c == 'J' || c == 'D') {
-                                    index++;
-                                }
-                                addLoad(method.instructions, c, i);
-                        }
-                        cursor++;
+                    Type type = Type.getMethodType(method.desc);
+                    
+                    int stackIndex = 0;
+                    for (Type argumentType : type.getArgumentTypes()) {
+                        method.instructions.add(new VarInsnNode(argumentType.getOpcode(Opcodes.ILOAD), stackIndex += argumentType.getSize()));
                     }
                     
-                    MethodType methodType = MethodType.methodType(
-                            CallSite.class,
-                            MethodHandles.Lookup.class,
-                            String.class,
-                            MethodType.class
-                    );
+                    method.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, getPlatformClass(name), method.name, method.desc));
+                    method.instructions.add(new InsnNode(type.getReturnType().getOpcode(Opcodes.IRETURN)));
                     
-                    Handle handle = new Handle(
-                            Opcodes.H_INVOKESTATIC,
-                            platformMethodsClass,
-                            "platform",
-                            methodType.toMethodDescriptorString(),
-                            false
-                    );
-                    
-                    method.instructions.add(new InvokeDynamicInsnNode(method.name, method.desc, handle));
-                    
-                    int i = returnValue.chars().filter(it -> it != '[').findFirst().getAsInt();
-                    addReturn(method.instructions, (char) i);
                     method.maxStack = -1;
-
+                    
                     // Add @ExpectPlatform.Transformed as a marker annotation
                     if (method.invisibleAnnotations == null) method.invisibleAnnotations = new ArrayList<>();
-                    method.invisibleAnnotations.add(new AnnotationNode(RemapInjectables.expectPlatformTransformed));
+                    method.invisibleAnnotations.add(new AnnotationNode(RemapInjectables.EXPECT_PLATFORM_TRANSFORMED));
                 }
             }
         }
@@ -164,56 +105,12 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
         return node;
     }
     
-    private void addLoad(InsnList insnList, char type, int index) {
-        switch (type) {
-            case ';':
-                insnList.add(new VarInsnNode(Opcodes.ALOAD, index));
-                break;
-            case 'I':
-            case 'S':
-            case 'B':
-            case 'C':
-            case 'Z':
-                insnList.add(new VarInsnNode(Opcodes.ILOAD, index));
-                break;
-            case 'F':
-                insnList.add(new VarInsnNode(Opcodes.FLOAD, index));
-                break;
-            case 'J':
-                insnList.add(new VarInsnNode(Opcodes.LLOAD, index));
-                break;
-            case 'D':
-                insnList.add(new VarInsnNode(Opcodes.DLOAD, index));
-                break;
-            default:
-                throw new IllegalStateException("Invalid Type: " + type);
-        }
-    }
-    
-    private void addReturn(InsnList insnList, char type) {
-        switch (type) {
-            case 'L':
-                insnList.add(new InsnNode(Opcodes.ARETURN));
-                break;
-            case 'I':
-            case 'S':
-            case 'B':
-            case 'C':
-            case 'Z':
-                insnList.add(new InsnNode(Opcodes.IRETURN));
-                break;
-            case 'F':
-                insnList.add(new InsnNode(Opcodes.FRETURN));
-                break;
-            case 'J':
-                insnList.add(new InsnNode(Opcodes.LRETURN));
-                break;
-            case 'D':
-                insnList.add(new InsnNode(Opcodes.DRETURN));
-                break;
-            case 'V':
-                insnList.add(new InsnNode(Opcodes.RETURN));
-                break;
-        }
+    private static String getPlatformClass(String lookupClass) {
+        String platform = System.getProperty(BuiltinProperties.PLATFORM_NAME);
+        Preconditions.checkNotNull(platform, BuiltinProperties.PLATFORM_NAME + " is not present!");
+        String lookupType = lookupClass.replace("$", "") + "Impl";
+        
+        return lookupType.substring(0, lookupType.lastIndexOf('.')) + "." + platform + "." +
+               lookupType.substring(lookupType.lastIndexOf('.') + 1);
     }
 }

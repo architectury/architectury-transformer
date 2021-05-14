@@ -50,7 +50,7 @@ public class GenerateFakeForgeMod extends AbstractFakeMod {
     
     private byte[] generateClass(String fakeModId) {
         ClassWriter writer = new ClassWriter(0);
-        writer.visit(52, Opcodes.ACC_PUBLIC, "generated/" + fakeModId, null, "java/lang/Object", null);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "generated/" + fakeModId, null, "java/lang/Object", null);
         AnnotationVisitor modAnnotation = writer.visitAnnotation("Lnet/minecraftforge/fml/common/Mod;", false);
         modAnnotation.visit("value", fakeModId);
         modAnnotation.visitEnd();

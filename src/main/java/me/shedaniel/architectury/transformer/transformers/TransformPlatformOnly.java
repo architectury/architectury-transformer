@@ -46,7 +46,7 @@ public class TransformPlatformOnly implements ClassEditTransformer {
         while (iter.hasNext()) {
             MethodNode method = iter.next();
             AnnotationNode annotation = Optional.ofNullable(method.invisibleAnnotations)
-                    .flatMap(nodes -> nodes.stream().filter(a -> a.desc.equals(RemapInjectables.platformOnly)).findAny())
+                    .flatMap(nodes -> nodes.stream().filter(a -> a.desc.equals(RemapInjectables.PLATFORM_ONLY)).findAny())
                     .orElse(null);
 
             if (annotation == null) continue;

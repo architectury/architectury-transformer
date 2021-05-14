@@ -34,10 +34,10 @@ import java.util.List;
  * Remap architectury injectables calls to the injected classes.
  */
 public class RemapInjectables implements TinyRemapperTransformer {
-    public static final String expectPlatform = "Lme/shedaniel/architectury/ExpectPlatform;";
-    public static final String expectPlatformNew = "Lme/shedaniel/architectury/annotations/ExpectPlatform;";
-    public static final String expectPlatformTransformed = "Lme/shedaniel/architectury/annotations/ExpectPlatform$Transformed;";
-    public static final String platformOnly = "Lme/shedaniel/architectury/annotations/PlatformOnly;";
+    public static final String EXPECT_PLATFORM_LEGACY = "Lme/shedaniel/architectury/ExpectPlatform;";
+    public static final String EXPECT_PLATFORM = "Lme/shedaniel/architectury/annotations/ExpectPlatform;";
+    public static final String EXPECT_PLATFORM_TRANSFORMED = "Lme/shedaniel/architectury/annotations/ExpectPlatform$Transformed;";
+    public static final String PLATFORM_ONLY = "Lme/shedaniel/architectury/annotations/PlatformOnly;";
 
     @Override
     public List<IMappingProvider> collectMappings() throws Exception {
