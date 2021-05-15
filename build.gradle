@@ -36,7 +36,6 @@ sourceSets {
         compileClasspath += sourceSets.agent.runtimeClasspath
         runtimeClasspath += sourceSets.agent.runtimeClasspath
     }
-    annotationsInject
 }
 
 license {
@@ -62,11 +61,6 @@ dependencies {
     implementation "com.google.code.gson:gson:2.8.5"
     implementation "me.shedaniel.architectury:refmap-remapper:1.0.3"
     compileOnly "org.jetbrains:annotations:20.1.0"
-}
-
-task annotationsInjectJar(type: Jar) {
-    classifier = 'annotations-inject'
-    from sourceSets.annotationsInject.output
 }
 
 task sourcesJar(type: Jar, dependsOn: classes) {
@@ -103,10 +97,6 @@ task runtimeJar(type: Jar, dependsOn: shadowJar) {
     from {
         sourceSets.runtime.output + zipTree(shadowJar.archiveFile)
     }
-    from(annotationsInjectJar.outputs) {
-        into "annotations-inject"
-        rename { "injection.jar" }
-    }
 }
 
 task runtimeSourcesJar(type: Jar, dependsOn: classes) {
@@ -133,10 +123,6 @@ shadowJar {
 
 task mainJar(type: Jar, dependsOn: shadowJar) {
     from zipTree(shadowJar.archiveFile)
-    from(annotationsInjectJar.outputs) {
-        into "annotations-inject"
-        rename { "injection.jar" }
-    }
 }
 
 build.dependsOn mainJar
