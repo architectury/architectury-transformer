@@ -46,7 +46,7 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
     private byte[] buildPlatformMethodClass(String className) {
         /* Generates the following class:
          * public final class PlatformMethods {
-         *   public static String getModLoader() {
+         *   public static String getCurrentTarget() {
          *     return platform;
          *   }
          * }
@@ -57,7 +57,7 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
         ClassWriter writer = new ClassWriter(0);
         writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL, className, null, "java/lang/Object", null);
         {
-            MethodVisitor method = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "getModLoader", "()Ljava/lang/String;", null, null);
+            MethodVisitor method = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "getCurrentTarget", "()Ljava/lang/String;", null, null);
             method.visitLdcInsn(platform);
             method.visitInsn(Opcodes.ARETURN);
             method.visitEnd();

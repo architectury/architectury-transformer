@@ -47,13 +47,6 @@ public class RemapInjectables implements TinyRemapperTransformer {
                         "me/shedaniel/architectury/targets/ArchitecturyTarget",
                         getUniqueIdentifier() + "/PlatformMethods"
                 );
-                sink.acceptMethod(
-                        new IMappingProvider.Member(
-                                "me/shedaniel/architectury/targets/ArchitecturyTarget",
-                                "getCurrentTarget",
-                                "()Ljava/lang/String;"
-                        ), "getModLoader"
-                );
             });
         }
         return Collections.emptyList();
