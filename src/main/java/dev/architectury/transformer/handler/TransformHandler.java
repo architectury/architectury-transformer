@@ -21,11 +21,18 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer.handler;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
+import dev.architectury.transformer.Transformer;
+import dev.architectury.transformer.input.OutputInterface;
+
+import java.io.Closeable;
+import java.util.List;
+
+public interface TransformHandler extends Closeable {
+    default TransformHandler asThreadLocked() {
+        return new ThreadLockedTransformHandler(this);
     }
+    
+    void handle(String input, OutputInterface output,  List<Transformer> transformers) throws Exception;
 }

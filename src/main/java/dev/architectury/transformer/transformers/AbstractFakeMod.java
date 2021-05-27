@@ -21,11 +21,14 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer.transformers;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
+import dev.architectury.transformer.transformers.base.AssetEditTransformer;
+
+import java.util.UUID;
+
+public abstract class AbstractFakeMod implements AssetEditTransformer {
+    protected String generateModId() {
+        return "generated_" + UUID.randomUUID().toString().substring(0, 7);
     }
 }

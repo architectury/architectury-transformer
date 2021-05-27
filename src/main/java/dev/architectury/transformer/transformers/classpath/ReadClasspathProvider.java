@@ -21,11 +21,13 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer.transformers.classpath;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
+import dev.architectury.transformer.transformers.ClasspathProvider;
+
+public interface ReadClasspathProvider {
+    static ReadClasspathProvider of(ClasspathProvider provider) {
+        return new ReadClasspathProviderImpl(provider.logging());
     }
+    byte[][] provide();
 }

@@ -21,11 +21,14 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer.transformers.base.edit;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
-    }
+public interface TransformerContext {
+    void appendArgument(String... args);
+    
+    boolean canModifyAssets();
+    
+    boolean canAppendArgument();
+    
+    boolean canAddClasses();
 }

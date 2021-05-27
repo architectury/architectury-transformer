@@ -21,11 +21,18 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer.transformers;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
-    }
+public class BuiltinProperties {
+    public static final String VERBOSE = "architectury.transformer.verbose";
+    public static final String DEBUG_OUTPUT = "architectury.transformer.debug_output";
+    public static final String LOCATION = "architectury.transformer.location";
+    public static final String MIXIN_MAPPINGS = "architectury.mixin.mappings";
+    public static final String INJECT_INJECTABLES = "architectury.inject.injectables";
+    public static final String UNIQUE_IDENTIFIER = "architectury.unique.identifier";
+    public static final String COMPILE_CLASSPATH = "architectury.classpath";
+    public static final String MAPPINGS_WITH_SRG = "architectury.srg.mappings";
+    public static final String REFMAP_NAME = "architectury.refmap.name";
+    public static final String MCMETA_VERSION = "architectury.mcmeta.version";
+    public static final String PLATFORM_NAME = "architectury.platform.name";
 }

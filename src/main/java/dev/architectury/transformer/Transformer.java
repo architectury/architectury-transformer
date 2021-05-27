@@ -21,11 +21,12 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+
+public interface Transformer extends Serializable {
+    default void writeObject(ObjectOutputStream stream) {
     }
 }

@@ -7,7 +7,7 @@ plugins {
     id "org.cadixdev.licenser" version "0.5.0"
 }
 
-group "me.shedaniel"
+group "dev.architectury"
 
 def isSnapshot = System.getenv("PR_NUM") != null
 def runNumber = (System.getenv("GITHUB_RUN_NUMBER") == null ? "9999" : System.getenv("GITHUB_RUN_NUMBER"))
@@ -23,7 +23,7 @@ logger.lifecycle(":building architectury transformer v${version}")
 sourceCompatibility = targetCompatibility = 1.8
 
 repositories {
-    maven { url "https://maven.shedaniel.me/" }
+    maven { url "https://maven.architectury.dev/" }
     maven { url "https://maven.fabricmc.net/" }
     mavenCentral()
 }
@@ -42,7 +42,7 @@ license {
     header = rootProject.file("HEADER")
 
     ext {
-        name = "shedaniel"
+        name = "architectury"
         year = "2020, 2021"
     }
 
@@ -59,7 +59,7 @@ dependencies {
     implementation "com.google.guava:guava:29.0-jre"
     implementation "org.zeroturnaround:zt-zip:1.13"
     implementation "com.google.code.gson:gson:2.8.5"
-    implementation "me.shedaniel.architectury:refmap-remapper:1.0.3"
+    implementation "dev.architectury:refmap-remapper:1.0.5"
     compileOnly "org.jetbrains:annotations:20.1.0"
 }
 
@@ -72,8 +72,8 @@ task agentJar(type: Jar) {
     classifier "agent"
     manifest {
         attributes(
-                "Premain-Class": "me.shedaniel.architectury.transformer.agent.TransformerAgent",
-                "Agent-Class": "me.shedaniel.architectury.transformer.agent.TransformerAgent",
+                "Premain-Class": "dev.architectury.transformer.agent.TransformerAgent",
+                "Agent-Class": "dev.architectury.transformer.agent.TransformerAgent",
                 "Can-Redefine-Classes": true,
                 "Can-Retransform-Classes": true
         )
@@ -90,7 +90,7 @@ task runtimeJar(type: Jar, dependsOn: shadowJar) {
     classifier "runtime"
     manifest {
         attributes(
-                "Main-Class": "me.shedaniel.architectury.transformer.TransformerRuntime",
+                "Main-Class": "dev.architectury.transformer.TransformerRuntime",
                 "Implementation-Version": project.version
         )
     }
@@ -109,14 +109,14 @@ jar {
 }
 
 shadowJar {
-    relocate "net.fabricmc", "me.shedaniel.architectury.transformer.shadowed.impl.net.fabricmc"
-    relocate "org.objectweb", "me.shedaniel.architectury.transformer.shadowed.impl.org.objectweb"
-    relocate "org.checkerframework", "me.shedaniel.architectury.transformer.shadowed.impl.org.checkerframework"
-    relocate "org.zeroturnaround", "me.shedaniel.architectury.transformer.shadowed.impl.org.zeroturnaround"
-    relocate "org.slf4j", "me.shedaniel.architectury.transformer.shadowed.impl.org.slf4j"
-    relocate "com.google", "me.shedaniel.architectury.transformer.shadowed.impl.com.google"
-    relocate "javax.annotation", "me.shedaniel.architectury.transformer.shadowed.impl.javax.annotation"
-    relocate "me.shedaniel.architectury.refmapremapper", "me.shedaniel.architectury.transformer.shadowed.impl.me.shedaniel.architectury.refmapremapper"
+    relocate "net.fabricmc", "dev.architectury.transformer.shadowed.impl.net.fabricmc"
+    relocate "org.objectweb", "dev.architectury.transformer.shadowed.impl.org.objectweb"
+    relocate "org.checkerframework", "dev.architectury.transformer.shadowed.impl.org.checkerframework"
+    relocate "org.zeroturnaround", "dev.architectury.transformer.shadowed.impl.org.zeroturnaround"
+    relocate "org.slf4j", "dev.architectury.transformer.shadowed.impl.org.slf4j"
+    relocate "com.google", "dev.architectury.transformer.shadowed.impl.com.google"
+    relocate "javax.annotation", "dev.architectury.transformer.shadowed.impl.javax.annotation"
+    relocate "dev.architectury.refmapremapper", "dev.architectury.transformer.shadowed.impl.dev.architectury.refmapremapper"
     configurations = [project.configurations.runtimeClasspath]
     classifier "shadow"
 }

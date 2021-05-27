@@ -21,11 +21,11 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
-    }
+import org.objectweb.asm.tree.ClassNode;
+
+@FunctionalInterface
+public interface ClassTransformer {
+    ClassNode transform(ClassNode clazz, ClassAdder classAdder) throws Exception;
 }

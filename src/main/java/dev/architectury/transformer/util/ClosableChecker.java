@@ -21,11 +21,25 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer.util;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
+import dev.architectury.transformer.input.ClosedIndicator;
+
+public abstract class ClosableChecker implements ClosedIndicator {
+    private boolean closed = false;
+    
+    protected void validateCloseState() {
+        if (closed) {
+            throw new IllegalStateException("Can't use this if this is closed already!");
+        }
+    }
+    
+    protected void closeAndValidate() {
+        closed = true;
+    }
+    
+    @Override
+    public boolean isClosed() {
+        return closed;
     }
 }

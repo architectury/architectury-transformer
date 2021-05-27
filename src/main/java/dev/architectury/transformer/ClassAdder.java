@@ -21,11 +21,9 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
-    }
+@FunctionalInterface
+public interface ClassAdder {
+    void add(String className, byte[] bytes) throws Exception;
 }

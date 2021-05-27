@@ -21,11 +21,42 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer.input;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
+import dev.architectury.transformer.util.ClosableChecker;
+
+import java.io.IOException;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+
+public abstract class AbstractOutputInterface extends ClosableChecker implements OutputInterface {
+    protected InputInterface inputInterface;
+    
+    public AbstractOutputInterface(InputInterface inputInterface) {
+        this.inputInterface = inputInterface;
+    }
+    
+    @Override
+    public void handle(Consumer<String> action) throws IOException {
+        validateCloseState();
+        if (inputInterface != null) {
+            inputInterface.handle(action);
+        }
+    }
+    
+    @Override
+    public void handle(BiConsumer<String, byte[]> action) throws IOException {
+        validateCloseState();
+        if (inputInterface != null) {
+            inputInterface.handle(action);
+        }
+    }
+    
+    @Override
+    public void close() throws IOException {
+        validateCloseState();
+        if (inputInterface != null) {
+            inputInterface.close();
+        }
     }
 }

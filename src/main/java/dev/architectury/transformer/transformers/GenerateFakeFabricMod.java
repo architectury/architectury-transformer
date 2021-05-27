@@ -21,11 +21,27 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer.transformers;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
+import dev.architectury.transformer.input.OutputInterface;
+import dev.architectury.transformer.transformers.base.edit.TransformerContext;
+
+/**
+ * Generates a fake fabric mod.
+ */
+public class GenerateFakeFabricMod extends AbstractFakeMod {
+    @Override
+    public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
+        String fakeModId = generateModId();
+        output.addFile("fabric.mod.json",
+                "{\n" +
+                "  \"schemaVersion\": 1,\n" +
+                "  \"id\": \"" + fakeModId + "\",\n" +
+                "  \"name\": \"Generated Mod (Please Ignore)\",\n" +
+                "  \"version\": \"1.0.0\",\n" +
+                "  \"custom\": {\n" +
+                "    \"fabric-loom:generated\": true\n" +
+                "  }\n" +
+                "}\n");
     }
 }

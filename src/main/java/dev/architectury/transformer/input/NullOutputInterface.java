@@ -21,11 +21,43 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer.input;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
+import java.io.IOException;
+import java.util.function.BiConsumer;
+import java.util.function.UnaryOperator;
+
+public final class NullOutputInterface implements OutputInterface {
+    private static final NullOutputInterface INSTANCE = new NullOutputInterface();
+    
+    private NullOutputInterface() {}
+    
+    public static OutputInterface of() {
+        return INSTANCE;
+    }
+    
+    @Override
+    public boolean addFile(String path, byte[] bytes) throws IOException {
+        return false;
+    }
+    
+    @Override
+    public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
+        return null;
+    }
+    
+    @Override
+    public void close() throws IOException {
+        
+    }
+    
+    @Override
+    public void handle(BiConsumer<String, byte[]> action) throws IOException {
+        
+    }
+    
+    @Override
+    public boolean isClosed() {
+        return false;
     }
 }

@@ -21,11 +21,26 @@
  * SOFTWARE.
  */
 
-package me.shedaniel.architectury.transformer;
+package dev.architectury.transformer.agent;
 
-@Deprecated
-public class TransformerRuntime {
-    public static void main(String[] args) throws Throwable {
-        dev.architectury.transformer.TransformerRuntime.main(args);
+import java.lang.instrument.Instrumentation;
+import java.util.Objects;
+
+public class TransformerAgent {
+    private static Instrumentation instrumentation;
+    
+    public static void premain(String args, Instrumentation instrumentation) {
+        agentmain(args, instrumentation);
+    }
+    
+    public static void agentmain(String args, Instrumentation instrumentation) {
+        if (!instrumentation.isRedefineClassesSupported()) {
+            System.out.println("your instrumentation suck");
+        }
+        TransformerAgent.instrumentation = instrumentation;
+    }
+    
+    public static Instrumentation getInstrumentation() {
+        return Objects.requireNonNull(instrumentation, "Architectury Transformer Java Agent not attached!");
     }
 }
