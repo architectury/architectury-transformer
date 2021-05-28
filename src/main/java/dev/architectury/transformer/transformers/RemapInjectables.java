@@ -46,10 +46,6 @@ public class RemapInjectables implements TinyRemapperTransformer {
         if (isInjectInjectables()) {
             return Collections.singletonList(sink -> {
                 sink.acceptClass(
-                        "me/shedaniel/architectury/targets/ArchitecturyTarget",
-                        getUniqueIdentifier() + "/PlatformMethods"
-                );
-                sink.acceptClass(
                         "dev/architectury/injectables/targets/ArchitecturyTarget",
                         getUniqueIdentifier() + "/PlatformMethods"
                 );
