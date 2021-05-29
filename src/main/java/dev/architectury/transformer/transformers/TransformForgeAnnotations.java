@@ -37,8 +37,10 @@ import java.util.stream.Collectors;
  * Handle @ForgeEvent and @ForgeEventCancellable and promote @Environment from being an invisible annotation to being an visible annotation.
  */
 public class TransformForgeAnnotations implements ClassEditTransformer {
-    public static final String FORGE_EVENT = "Lme/shedaniel/architectury/ForgeEvent;";
-    public static final String FORGE_EVENT_CANCELLABLE = "Lme/shedaniel/architectury/ForgeEventCancellable;";
+    public static final String FORGE_EVENT_LEGACY = "Lme/shedaniel/architectury/ForgeEvent;";
+    public static final String FORGE_EVENT = "Ldev/architectury/annotations/ForgeEvent;";
+    public static final String FORGE_EVENT_CANCELLABLE_LEGACY = "Lme/shedaniel/architectury/ForgeEventCancellable;";
+    public static final String FORGE_EVENT_CANCELLABLE = "Ldev/architectury/annotations/ForgeEventCancellable;";
     public static final String CANCELABLE = "Lnet/minecraftforge/eventbus/api/Cancelable;";
     
     private static final String ENVIRONMENT = "net/fabricmc/api/Environment";
@@ -49,6 +51,7 @@ public class TransformForgeAnnotations implements ClassEditTransformer {
         if ((node.access & Opcodes.ACC_INTERFACE) == 0) {
             if (node.visibleAnnotations != null && node.visibleAnnotations.stream().anyMatch(
                     annotation -> Objects.equals(annotation.desc, FORGE_EVENT) || Objects.equals(annotation.desc, FORGE_EVENT_CANCELLABLE)
+                                  || Objects.equals(annotation.desc, FORGE_EVENT_LEGACY) || Objects.equals(annotation.desc, FORGE_EVENT_CANCELLABLE_LEGACY)
             )) {
                 node.superName = "net/minecraftforge/eventbus/api/Event";
                 for (MethodNode method : node.methods) {
@@ -70,7 +73,8 @@ public class TransformForgeAnnotations implements ClassEditTransformer {
                     node.signature = s + "Lnet/minecraftforge/eventbus/api/Event;";
                 }
                 // if @ForgeEventCancellable, add the cancellable annotation from forge
-                if (node.visibleAnnotations.stream().anyMatch(annotation -> Objects.equals(annotation.desc, FORGE_EVENT_CANCELLABLE)) &&
+                if ((node.visibleAnnotations.stream().anyMatch(annotation -> Objects.equals(annotation.desc, FORGE_EVENT_CANCELLABLE_LEGACY))
+                    || node.visibleAnnotations.stream().anyMatch(annotation -> Objects.equals(annotation.desc, FORGE_EVENT_CANCELLABLE))) &&
                     node.visibleAnnotations.stream().noneMatch(annotation -> Objects.equals(annotation.desc, CANCELABLE))) {
                     node.visibleAnnotations.add(new AnnotationNode(CANCELABLE));
                 }
