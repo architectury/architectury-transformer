@@ -63,6 +63,7 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
             MethodVisitor method = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "getCurrentTarget", "()Ljava/lang/String;", null, null);
             method.visitLdcInsn(platform);
             method.visitInsn(Opcodes.ARETURN);
+            method.visitMaxs(0, 0);
             method.visitEnd();
         }
         writer.visitEnd();
