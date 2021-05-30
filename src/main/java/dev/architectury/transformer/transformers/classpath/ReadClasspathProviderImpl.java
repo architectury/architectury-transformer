@@ -23,9 +23,9 @@
 
 package dev.architectury.transformer.transformers.classpath;
 
+import dev.architectury.tinyremapper.FileSystemHandler;
 import dev.architectury.transformer.Transform;
 import dev.architectury.transformer.transformers.ClasspathProvider;
-import net.fabricmc.tinyremapper.FileSystemHandler;
 
 import java.io.IOException;
 import java.net.URI;

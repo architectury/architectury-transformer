@@ -23,12 +23,12 @@
 
 package dev.architectury.transformer.transformers;
 
+import dev.architectury.tinyremapper.IMappingProvider;
+import dev.architectury.tinyremapper.TinyUtils;
 import dev.architectury.transformer.transformers.base.TinyRemapperTransformer;
 import dev.architectury.transformer.util.Logger;
 import net.fabricmc.mapping.tree.TinyMappingFactory;
 import net.fabricmc.mapping.tree.TinyTree;
-import net.fabricmc.tinyremapper.IMappingProvider;
-import net.fabricmc.tinyremapper.TinyUtils;
 
 import java.io.BufferedReader;
 import java.io.File;

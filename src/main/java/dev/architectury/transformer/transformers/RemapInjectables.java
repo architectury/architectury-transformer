@@ -23,8 +23,8 @@
 
 package dev.architectury.transformer.transformers;
 
+import dev.architectury.tinyremapper.IMappingProvider;
 import dev.architectury.transformer.transformers.base.TinyRemapperTransformer;
-import net.fabricmc.tinyremapper.IMappingProvider;
 
 import java.io.File;
 import java.util.Collections;

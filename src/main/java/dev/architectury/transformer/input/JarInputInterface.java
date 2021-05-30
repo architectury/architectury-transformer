@@ -24,6 +24,7 @@
 package dev.architectury.transformer.input;
 
 import dev.architectury.transformer.util.ClosableChecker;
+import dev.architectury.transformer.util.Logger;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -123,6 +124,7 @@ public class JarInputInterface extends ClosableChecker implements InputInterface
     public void close() throws IOException {
         closeAndValidate();
         if (shouldCloseFs) {
+            Logger.debug("Closing File Systems for " + path);
             fs.close();
         }
         cache.clear();

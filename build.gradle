@@ -50,7 +50,7 @@ license {
 }
 
 dependencies {
-    implementation "net.fabricmc:tiny-remapper:0.3.2-architectury.6"
+    implementation "dev.architectury:tiny-remapper:1.1.0"
     implementation "net.fabricmc:tiny-mappings-parser:0.2.2.14"
     implementation "org.ow2.asm:asm:9.1"
     implementation "org.ow2.asm:asm-commons:9.1"
@@ -116,6 +116,7 @@ shadowJar {
     relocate "org.slf4j", "dev.architectury.transformer.shadowed.impl.org.slf4j"
     relocate "com.google", "dev.architectury.transformer.shadowed.impl.com.google"
     relocate "javax.annotation", "dev.architectury.transformer.shadowed.impl.javax.annotation"
+    relocate "dev.architectury.tinyremapper", "dev.architectury.transformer.shadowed.impl.dev.architectury.tinyremapper"
     relocate "dev.architectury.refmapremapper", "dev.architectury.transformer.shadowed.impl.dev.architectury.refmapremapper"
     configurations = [project.configurations.runtimeClasspath]
     classifier "shadow"

@@ -23,11 +23,11 @@
 
 package dev.architectury.transformer.handler;
 
+import dev.architectury.tinyremapper.IMappingProvider;
+import dev.architectury.tinyremapper.TinyRemapper;
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.transformers.classpath.ReadClasspathProvider;
 import dev.architectury.transformer.util.Logger;
-import net.fabricmc.tinyremapper.IMappingProvider;
-import net.fabricmc.tinyremapper.TinyRemapper;
 
 import java.io.IOException;
 import java.util.Set;
@@ -47,6 +47,7 @@ public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHan
                 .cacheMappings(true)
                 .skipPropagate(true)
                 .logger(Logger::info)
+                .logUnknownInvokeDynamic(false)
                 .threads(Runtime.getRuntime().availableProcessors())
                 .build();
         

@@ -23,6 +23,8 @@
 
 package dev.architectury.transformer.handler;
 
+import dev.architectury.tinyremapper.IMappingProvider;
+import dev.architectury.tinyremapper.TinyRemapper;
 import dev.architectury.transformer.Transformer;
 import dev.architectury.transformer.input.OutputInterface;
 import dev.architectury.transformer.transformers.base.AssetEditTransformer;
@@ -32,8 +34,6 @@ import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.transformers.classpath.ReadClasspathProvider;
 import dev.architectury.transformer.util.Logger;
 import dev.architectury.transformer.util.LoggerFilter;
-import net.fabricmc.tinyremapper.IMappingProvider;
-import net.fabricmc.tinyremapper.TinyRemapper;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -153,6 +153,7 @@ public class SimpleTransformerHandler implements TransformHandler {
             builder.withMappings(provider);
         }
         builder.skipConflictsChecking(true);
+        builder.logUnknownInvokeDynamic(false);
         TinyRemapper remapper = builder.build();
         
         remapper.readClassPath(classpath.provide());
