@@ -45,12 +45,12 @@ public class GenerateFakeForgeMod extends AbstractFakeMod {
                 "modId = \"" + fakeModId + "\"\n");
         output.addFile("pack.mcmeta",
                 "{\"pack\":{\"description\":\"Generated\",\"pack_format\":" + System.getProperty(BuiltinProperties.MCMETA_VERSION, "4") + "}}");
-        output.addFile("generated/" + fakeModId + ".class", generateClass(fakeModId));
+        output.addFile("generated" + fakeModId + "/" + fakeModId + ".class", generateClass(fakeModId));
     }
     
     private byte[] generateClass(String fakeModId) {
         ClassWriter writer = new ClassWriter(0);
-        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "generated/" + fakeModId, null, "java/lang/Object", null);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "generated" + fakeModId + "/" + fakeModId, null, "java/lang/Object", null);
         AnnotationVisitor modAnnotation = writer.visitAnnotation("Lnet/minecraftforge/fml/common/Mod;", false);
         modAnnotation.visit("value", fakeModId);
         modAnnotation.visitEnd();
