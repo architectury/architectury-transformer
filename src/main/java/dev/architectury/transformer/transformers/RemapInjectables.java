@@ -23,6 +23,8 @@
 
 package dev.architectury.transformer.transformers;
 
+import com.google.common.base.MoreObjects;
+import com.google.gson.JsonObject;
 import dev.architectury.tinyremapper.IMappingProvider;
 import dev.architectury.transformer.transformers.base.TinyRemapperTransformer;
 
@@ -40,14 +42,21 @@ public class RemapInjectables implements TinyRemapperTransformer {
     public static final String EXPECT_PLATFORM_TRANSFORMED = "Ldev/architectury/injectables/annotations/ExpectPlatform$Transformed;";
     public static final String PLATFORM_ONLY_LEGACY = "Lme/shedaniel/architectury/annotations/PlatformOnly;";
     public static final String PLATFORM_ONLY = "Ldev/architectury/injectables/annotations/PlatformOnly;";
-
+    private String uniqueIdentifier = null;
+    
+    @Override
+    public void supplyProperties(JsonObject json) {
+        uniqueIdentifier = json.has(BuiltinProperties.UNIQUE_IDENTIFIER) ?
+                json.getAsJsonPrimitive(BuiltinProperties.UNIQUE_IDENTIFIER).getAsString() : null;
+    }
+    
     @Override
     public List<IMappingProvider> collectMappings() throws Exception {
         if (isInjectInjectables()) {
             return Collections.singletonList(sink -> {
                 sink.acceptClass(
                         "dev/architectury/injectables/targets/ArchitecturyTarget",
-                        getUniqueIdentifier() + "/PlatformMethods"
+                        MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods"
                 );
             });
         }

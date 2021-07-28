@@ -21,17 +21,40 @@
  * SOFTWARE.
  */
 
-package dev.architectury.transformer;
+package dev.architectury.transformer.transformers.base.edit;
 
-import com.google.gson.JsonObject;
+import java.util.function.Consumer;
 
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
-
-public interface Transformer extends Serializable {
-    default void writeObject(ObjectOutputStream stream) {
+public final class SimpleTransformerContext implements TransformerContext {
+    private final Consumer<String[]> appendArgument;
+    private final boolean canModifyAssets;
+    private final boolean canAppendArgument;
+    private final boolean canAddClasses;
+    
+    public SimpleTransformerContext(Consumer<String[]> appendArgument, boolean canModifyAssets, boolean canAppendArgument, boolean canAddClasses) {
+        this.appendArgument = appendArgument;
+        this.canModifyAssets = canModifyAssets;
+        this.canAppendArgument = canAppendArgument;
+        this.canAddClasses = canAddClasses;
     }
     
-    default void supplyProperties(JsonObject json) {
+    @Override
+    public void appendArgument(String... args) {
+        appendArgument.accept(args);
+    }
+    
+    @Override
+    public boolean canModifyAssets() {
+        return canModifyAssets;
+    }
+    
+    @Override
+    public boolean canAppendArgument() {
+        return canAppendArgument;
+    }
+    
+    @Override
+    public boolean canAddClasses() {
+        return canAddClasses;
     }
 }

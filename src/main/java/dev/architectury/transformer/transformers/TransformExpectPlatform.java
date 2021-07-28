@@ -23,7 +23,9 @@
 
 package dev.architectury.transformer.transformers;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
+import com.google.gson.JsonObject;
 import dev.architectury.transformer.input.OutputInterface;
 import dev.architectury.transformer.transformers.base.AssetEditTransformer;
 import dev.architectury.transformer.transformers.base.ClassEditTransformer;
@@ -38,11 +40,21 @@ import org.objectweb.asm.tree.*;
 import java.util.ArrayList;
 import java.util.Objects;
 
+import static dev.architectury.transformer.transformers.RemapInjectables.getUniqueIdentifier;
+
 public class TransformExpectPlatform implements AssetEditTransformer, ClassEditTransformer {
+    private String uniqueIdentifier = null;
+    
+    @Override
+    public void supplyProperties(JsonObject json) {
+        uniqueIdentifier = json.has(BuiltinProperties.UNIQUE_IDENTIFIER) ?
+                json.getAsJsonPrimitive(BuiltinProperties.UNIQUE_IDENTIFIER).getAsString() : null;
+    }
+    
     @Override
     public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
         if (!RemapInjectables.isInjectInjectables()) return;
-        String className = RemapInjectables.getUniqueIdentifier() + "/PlatformMethods";
+        String className = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods";
         output.addClass(className, buildPlatformMethodClass(className));
     }
     
@@ -79,9 +91,9 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
             if (method.visibleAnnotations != null && method.visibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM_LEGACY))) {
                 platformMethodsClass = "me/shedaniel/architectury/PlatformMethods";
             } else if (method.invisibleAnnotations != null && method.invisibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM))) {
-                platformMethodsClass = RemapInjectables.getUniqueIdentifier() + "/PlatformMethods";
+                platformMethodsClass = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods";
             } else if (method.invisibleAnnotations != null && method.invisibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM_LEGACY2))) {
-                platformMethodsClass = RemapInjectables.getUniqueIdentifier() + "/PlatformMethods";
+                platformMethodsClass = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods";
             }
             
             if (platformMethodsClass != null) {

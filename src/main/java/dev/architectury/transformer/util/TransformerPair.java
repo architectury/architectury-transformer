@@ -21,17 +21,39 @@
  * SOFTWARE.
  */
 
-package dev.architectury.transformer;
+package dev.architectury.transformer.util;
 
+import com.google.common.base.MoreObjects;
 import com.google.gson.JsonObject;
+import dev.architectury.transformer.Transformer;
+import org.jetbrains.annotations.Nullable;
 
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
-
-public interface Transformer extends Serializable {
-    default void writeObject(ObjectOutputStream stream) {
+public class TransformerPair {
+    private final Class<? extends Transformer> clazz;
+    @Nullable
+    private final JsonObject properties;
+    
+    public TransformerPair(Class<? extends Transformer> clazz, @Nullable JsonObject properties) {
+        this.clazz = clazz;
+        this.properties = properties;
     }
     
-    default void supplyProperties(JsonObject json) {
+    public Class<? extends Transformer> getClazz() {
+        return clazz;
+    }
+    
+    @Nullable
+    public JsonObject getProperties() {
+        return properties;
+    }
+    
+    public Transformer construct() {
+        try {
+            Transformer transformer = clazz.getConstructor().newInstance();
+            transformer.supplyProperties(MoreObjects.firstNonNull(properties, new JsonObject()));
+            return transformer;
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
     }
 }

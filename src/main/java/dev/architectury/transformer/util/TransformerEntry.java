@@ -21,17 +21,24 @@
  * SOFTWARE.
  */
 
-package dev.architectury.transformer;
+package dev.architectury.transformer.util;
 
-import com.google.gson.JsonObject;
+import java.nio.file.Path;
 
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
-
-public interface Transformer extends Serializable {
-    default void writeObject(ObjectOutputStream stream) {
+public class TransformerEntry {
+    private final Path path;
+    private final TransformerPair transformer;
+    
+    public TransformerEntry(Path path, TransformerPair transformer) {
+        this.path = path;
+        this.transformer = transformer;
     }
     
-    default void supplyProperties(JsonObject json) {
+    public Path getPath() {
+        return path;
+    }
+    
+    public TransformerPair getTransformer() {
+        return transformer;
     }
 }

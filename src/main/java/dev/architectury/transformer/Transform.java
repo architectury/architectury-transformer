@@ -29,6 +29,7 @@ import dev.architectury.transformer.input.OpenedOutputInterface;
 import dev.architectury.transformer.input.OutputInterface;
 import dev.architectury.transformer.transformers.BuiltinProperties;
 import dev.architectury.transformer.transformers.ClasspathProvider;
+import dev.architectury.transformer.transformers.base.edit.SimpleTransformerContext;
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.transformers.classpath.ReadClasspathProvider;
 import dev.architectury.transformer.util.Logger;
@@ -74,27 +75,8 @@ public class Transform {
     }
     
     public static void runTransformers(Path input, Path output, List<Transformer> transformers) throws Exception {
-        TransformerContext context = new TransformerContext() {
-            @Override
-            public void appendArgument(String... args) {
-                throw new IllegalStateException();
-            }
-            
-            @Override
-            public boolean canModifyAssets() {
-                return true;
-            }
-            
-            @Override
-            public boolean canAppendArgument() {
-                return false;
-            }
-            
-            @Override
-            public boolean canAddClasses() {
-                return true;
-            }
-        };
+        TransformerContext context = new SimpleTransformerContext(args -> {throw new IllegalStateException();},
+                true, false, true);
         ClasspathProvider classpath = ClasspathProvider.fromProperties().filter(path -> {
             return !Objects.equals(input.toFile().getAbsoluteFile(), path.toFile().getAbsoluteFile());
         });
