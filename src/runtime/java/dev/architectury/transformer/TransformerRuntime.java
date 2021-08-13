@@ -23,7 +23,6 @@
 
 package dev.architectury.transformer;
 
-import com.google.common.hash.Hashing;
 import dev.architectury.transformer.agent.TransformerAgent;
 import dev.architectury.transformer.handler.SimpleTransformerHandler;
 import dev.architectury.transformer.handler.TinyRemapperPreparedTransformerHandler;
@@ -35,6 +34,7 @@ import dev.architectury.transformer.transformers.base.edit.SimpleTransformerCont
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.transformers.classpath.ReadClasspathProvider;
 import dev.architectury.transformer.transformers.properties.TransformersReader;
+import dev.architectury.transformer.util.HashUtils;
 import dev.architectury.transformer.util.Logger;
 import dev.architectury.transformer.util.TransformerPair;
 
@@ -146,7 +146,7 @@ public class TransformerRuntime {
                         public boolean addFile(String path, byte[] bytes) throws IOException {
                             String s = stripLeadingSlash.apply(path);
                             if (s.endsWith(".class")) {
-                                classRedefineCache.put(s.substring(0, s.length() - 6), sha256(bytes));
+                                classRedefineCache.put(s.substring(0, s.length() - 6), HashUtils.sha256(bytes));
                             }
                             return outputInterface.addFile(s, bytes) && (debugOut == null || debugOut.addFile(s, bytes));
                         }
@@ -196,7 +196,7 @@ public class TransformerRuntime {
                                 if (outputInterface.addFile(s, bytes) && (debugOut == null || debugOut.addFile(s, bytes))) {
                                     if (path.endsWith(".class")) {
                                         s = s.substring(0, s.length() - 6);
-                                        String sha256 = sha256(bytes);
+                                        String sha256 = HashUtils.sha256(bytes);
                                         if (!Objects.equals(classRedefineCache.get(s), sha256)) {
                                             classRedefineCache.put(s, sha256);
                                             redefine.put(s, bytes);
@@ -220,7 +220,7 @@ public class TransformerRuntime {
                                     if (path.endsWith(".class")) {
                                         String s = stripLeadingSlash.apply(path);
                                         s = s.substring(0, s.length() - 6);
-                                        String sha256 = sha256(bytes);
+                                        String sha256 = HashUtils.sha256(bytes);
                                         if (!Objects.equals(classRedefineCache.get(s), sha256)) {
                                             classRedefineCache.put(s, sha256);
                                             redefine.put(s, bytes);
@@ -273,11 +273,6 @@ public class TransformerRuntime {
                         .map(TransformerPair::construct)
                         .collect(Collectors.toList())))
                 .collect(Collectors.toList());
-    }
-    
-    @SuppressWarnings("UnstableApiUsage")
-    private static String sha256(byte[] bytes) {
-        return Hashing.sha256().hashBytes(bytes).toString();
     }
     
     private static void redefineClasses(Map<String, byte[]> redefine) throws Exception {
