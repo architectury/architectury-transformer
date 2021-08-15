@@ -31,43 +31,44 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
-public class OpenedInputInterface extends ClosableChecker implements InputInterface {
+public class OpenedFileAccess extends ClosableChecker implements FileAccess {
     private final Provider provider;
     private Lock lock = new ReentrantLock();
-    private InputInterface inputInterface;
+    private FileAccess fileAccess;
     
-    protected OpenedInputInterface(Provider provider) {
+    protected OpenedFileAccess(Provider provider) {
         this.provider = provider;
     }
     
-    public static OpenedInputInterface of(Provider provider) {
-        return new OpenedInputInterface(provider);
+    public static OpenedFileAccess of(Provider provider) {
+        return new OpenedFileAccess(provider);
     }
     
-    public static OpenedInputInterface ofJar(Path path) {
-        return new OpenedInputInterface(() -> new JarInputInterface(path));
+    public static OpenedFileAccess ofJar(Path path) {
+        return new OpenedFileAccess(() -> new JarFileAccess(path));
     }
     
-    public static OpenedInputInterface ofDirectory(Path path) {
-        return new OpenedInputInterface(() -> new DirectoryInputInterface(path));
+    public static OpenedFileAccess ofDirectory(Path path) {
+        return new OpenedFileAccess(() -> new DirectoryFileAccess(path));
     }
     
     @FunctionalInterface
     public interface Provider {
-        InputInterface provide() throws IOException;
+        FileAccess provide() throws IOException;
     }
     
-    private InputInterface getParent() throws IOException {
+    private FileAccess getParent() throws IOException {
         validateCloseState();
         
         try {
             lock.lock();
-            if (inputInterface == null || inputInterface.isClosed()) {
-                return inputInterface = provider.provide();
+            if (fileAccess == null || fileAccess.isClosed()) {
+                return fileAccess = provider.provide();
             }
             
-            return inputInterface;
+            return fileAccess;
         } finally {
             lock.unlock();
         }
@@ -84,11 +85,21 @@ public class OpenedInputInterface extends ClosableChecker implements InputInterf
     }
     
     @Override
+    public boolean addFile(String path, byte[] bytes) throws IOException {
+        return getParent().addFile(path, bytes);
+    }
+    
+    @Override
+    public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
+        return getParent().modifyFile(path, action);
+    }
+    
+    @Override
     public void close() throws IOException {
         closeAndValidate();
-        if (inputInterface != null) {
-            inputInterface.close();
+        if (fileAccess != null) {
+            fileAccess.close();
         }
-        inputInterface = null;
+        fileAccess = null;
     }
 }

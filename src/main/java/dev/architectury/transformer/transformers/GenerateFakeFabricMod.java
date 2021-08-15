@@ -23,7 +23,7 @@
 
 package dev.architectury.transformer.transformers;
 
-import dev.architectury.transformer.input.OutputInterface;
+import dev.architectury.transformer.input.FileAccess;
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 
 /**
@@ -31,7 +31,7 @@ import dev.architectury.transformer.transformers.base.edit.TransformerContext;
  */
 public class GenerateFakeFabricMod extends AbstractFakeMod {
     @Override
-    public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
+    public void doEdit(TransformerContext context, FileAccess output) throws Exception {
         String fakeModId = generateModId();
         output.addFile("fabric.mod.json",
                 "{\n" +

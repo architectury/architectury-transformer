@@ -70,7 +70,7 @@ public class TransformerRuntime {
     public static final String MAIN_CLASS = "architectury.main.class";
     public static final String PROPERTIES = "architectury.properties";
     public static final Set<File> TRANSFORM_FILES = new HashSet<>();
-    public static final Map<String, Map.Entry<List<Transformer>, DirectoryOutputInterface>> CLASSES_TO_TRANSFORM = new HashMap<>();
+    public static final Map<String, Map.Entry<List<Transformer>, DirectoryFileAccess>> CLASSES_TO_TRANSFORM = new HashMap<>();
     private static ReadClasspathProvider classpathProvider;
     
     private static boolean isDebugOutputEnabled() {
@@ -87,15 +87,15 @@ public class TransformerRuntime {
         String configText = new String(Files.readAllBytes(configPath), StandardCharsets.UTF_8);
         List<PathWithTransformersEntry> toTransform = parsePathWithTransformersEntries(configText);
         
-        UnaryOperator<String> stripLeadingSlash = Transform::stripLoadingSlash;
+        UnaryOperator<String> stripLeadingSlash = Transform::trimSlashes;
         AtomicInteger i = new AtomicInteger();
-        Map<Path, DirectoryOutputInterface> debugOuts = new ConcurrentHashMap<>();
+        Map<Path, DirectoryFileAccess> debugOuts = new ConcurrentHashMap<>();
         for (PathWithTransformersEntry entry : toTransform) {
-            DirectoryOutputInterface debugOut = isDebugOutputEnabled() ? debugOuts.computeIfAbsent(entry.getPath(), key -> {
+            DirectoryFileAccess debugOut = isDebugOutputEnabled() ? debugOuts.computeIfAbsent(entry.getPath(), key -> {
                 try {
                     Path file = Paths.get(System.getProperty(BuiltinProperties.LOCATION, System.getProperty("user.dir"))).resolve(".architectury-transformer/debug-" + entry.getPath().getFileName().toString() + "-" + (i.incrementAndGet()));
                     Files.createDirectories(file);
-                    return DirectoryOutputInterface.of(file);
+                    return DirectoryFileAccess.of(file);
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
@@ -106,8 +106,8 @@ public class TransformerRuntime {
                     CLASSES_TO_TRANSFORM.put(stripLeadingSlash.apply(entry.getPath().relativize(path).toString()), new AbstractMap.SimpleEntry<>(entry.getTransformers(), debugOut));
                 });
             } else {
-                try (OpenedInputInterface inputInterface = OpenedInputInterface.ofJar(entry.getPath())) {
-                    inputInterface.handle(path -> {
+                try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(entry.getPath())) {
+                    outputInterface.handle(path -> {
                         String key = stripLeadingSlash.apply(path);
                         CLASSES_TO_TRANSFORM.put(stripLeadingSlash.apply(path), new AbstractMap.SimpleEntry<>(entry.getTransformers(), debugOut));
                     });
@@ -127,13 +127,13 @@ public class TransformerRuntime {
         doInstrumentationStuff();
         for (PathWithTransformersEntry entry : toTransform) {
             Map<String, String> classRedefineCache = new HashMap<>();
-            DirectoryOutputInterface debugOut = debugOuts.get(entry.getPath());
+            DirectoryFileAccess debugOut = debugOuts.get(entry.getPath());
             Path tmpJar = Files.createTempFile(null, ".jar");
             tmpJars.add(tmpJar);
             Files.deleteIfExists(tmpJar);
             Files.copy(entry.getPath(), tmpJar);
-            try (OpenedOutputInterface outputInterface = OpenedOutputInterface.ofJar(tmpJar)) {
-                try (OpenedInputInterface inputInterface = OpenedInputInterface.ofJar(entry.getPath())) {
+            try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(tmpJar)) {
+                try (OpenedFileAccess inputInterface = OpenedFileAccess.ofJar(entry.getPath())) {
                     Logger.debug("Transforming " + entry.getTransformers().size() + " transformer(s) from " + entry.getPath().toString() + " to " + tmpJar + ": ");
                     for (Transformer transformer : entry.getTransformers()) {
                         Logger.debug(" - " + transformer.toString());
@@ -141,7 +141,7 @@ public class TransformerRuntime {
                     Transform.runTransformers(new SimpleTransformerContext(a -> {
                         argsList.addAll(Arrays.asList(a));
                         Logger.debug("Appended Launch Argument: " + Arrays.toString(a));
-                    }, false, true, true), classpathProvider, entry.getPath().toString(), new AbstractOutputInterface(inputInterface) {
+                    }, false, true, true), classpathProvider, entry.getPath().toString(), new AbstractFileAccess(inputInterface) {
                         @Override
                         public boolean addFile(String path, byte[] bytes) throws IOException {
                             String s = stripLeadingSlash.apply(path);
@@ -178,18 +178,18 @@ public class TransformerRuntime {
             populateAddUrl().accept(tmpJar.toUri().toURL());
             
             new PathModifyListener(entry.getPath(), path -> {
-                try (OpenedOutputInterface outputInterface = OpenedOutputInterface.ofJar(tmpJar)) {
+                try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(tmpJar)) {
                     Thread.sleep(4000);
                     Logger.info("Detected File Modification at " + path.getFileName().toString());
                     Map<String, byte[]> redefine = new HashMap<>();
-                    try (OpenedInputInterface inputInterface = OpenedInputInterface.ofJar(entry.getPath())) {
+                    try (OpenedFileAccess inputInterface = OpenedFileAccess.ofJar(entry.getPath())) {
                         Logger.debug("Transforming " + entry.getTransformers().size() + " transformer(s) from " + entry.getPath().toString() + " to " + tmpJar + ": ");
                         for (Transformer transformer : entry.getTransformers()) {
                             Logger.debug(" - " + transformer.toString());
                         }
                         Transform.runTransformers(new SimpleTransformerContext(
                                 $ -> {}, true, false, false
-                        ), classpathProvider, entry.getPath().toString(), new AbstractOutputInterface(inputInterface) {
+                        ), classpathProvider, entry.getPath().toString(), new AbstractFileAccess(inputInterface) {
                             @Override
                             public boolean addFile(String path, byte[] bytes) throws IOException {
                                 String s = stripLeadingSlash.apply(path);
@@ -233,7 +233,7 @@ public class TransformerRuntime {
                             
                             @Override
                             public String toString() {
-                                return inputInterface.toString();
+                                return fileView.toString();
                             }
                             
                             @Override
@@ -311,9 +311,9 @@ public class TransformerRuntime {
         try {
             TransformerContext context = new SimpleTransformerContext(args -> {}, false, true, false);
             if (prepare) {
-                handler = new TinyRemapperPreparedTransformerHandler(classpathProvider, context).asThreadLocked();
+                handler = new TinyRemapperPreparedTransformerHandler(classpathProvider, context, false).asThreadLocked();
             } else {
-                handler = new SimpleTransformerHandler(classpathProvider, context).asThreadLocked();
+                handler = new SimpleTransformerHandler(classpathProvider, context, false).asThreadLocked();
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -324,11 +324,11 @@ public class TransformerRuntime {
             public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) {
                 if (loader == ClassLoader.getSystemClassLoader()) return classfileBuffer;
                 AtomicReference<byte[]> classBytes = new AtomicReference<>(classfileBuffer);
-                Map.Entry<List<Transformer>, DirectoryOutputInterface> transformers = CLASSES_TO_TRANSFORM.get(className + ".class");
+                Map.Entry<List<Transformer>, DirectoryFileAccess> transformers = CLASSES_TO_TRANSFORM.get(className + ".class");
                 if (transformers != null) {
                     try {
                         Transform.measureTime(() -> {
-                            handler.handle(className + ".class", new OutputInterface() {
+                            handler.handle(className + ".class", new FileAccess() {
                                 @Override
                                 public boolean isClosed() {
                                     return false;
@@ -346,7 +346,7 @@ public class TransformerRuntime {
                                 
                                 @Override
                                 public boolean addFile(String path, byte[] bytes) {
-                                    if (Transform.stripLoadingSlash(path).equals(className + ".class") && bytes != null) {
+                                    if (Transform.trimSlashes(path).equals(className + ".class") && bytes != null) {
                                         classBytes.set(bytes);
                                         return true;
                                     }
@@ -356,7 +356,7 @@ public class TransformerRuntime {
                                 
                                 @Override
                                 public byte[] modifyFile(String path, UnaryOperator<byte[]> action) {
-                                    if (Transform.stripLoadingSlash(path).equals(className + ".class")) {
+                                    if (Transform.trimSlashes(path).equals(className + ".class")) {
                                         classBytes.set(action.apply(classBytes.get()));
                                         return classBytes.get();
                                     }

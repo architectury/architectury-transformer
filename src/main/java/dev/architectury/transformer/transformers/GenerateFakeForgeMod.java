@@ -23,7 +23,7 @@
 
 package dev.architectury.transformer.transformers;
 
-import dev.architectury.transformer.input.OutputInterface;
+import dev.architectury.transformer.input.FileAccess;
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -35,7 +35,7 @@ import org.objectweb.asm.Opcodes;
  */
 public class GenerateFakeForgeMod extends AbstractFakeMod {
     @Override
-    public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
+    public void doEdit(TransformerContext context, FileAccess output) throws Exception {
         String fakeModId = generateModId();
         output.addFile("META-INF/mods.toml",
                 "modLoader = \"javafml\"\n" +

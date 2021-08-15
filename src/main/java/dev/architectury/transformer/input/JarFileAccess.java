@@ -23,29 +23,24 @@
 
 package dev.architectury.transformer.input;
 
-import dev.architectury.transformer.util.ClosableChecker;
 import dev.architectury.transformer.util.Logger;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
 
-public class JarInputInterface extends ClosableChecker implements InputInterface {
-    private static final WeakHashMap<Path, JarInputInterface> INTERFACES = new WeakHashMap<>();
+public class JarFileAccess extends NIOFileAccess {
+    private static final WeakHashMap<Path, JarFileAccess> INTERFACES = new WeakHashMap<>();
     protected final Path path;
     private boolean shouldCloseFs;
     private FileSystem fs;
-    protected final Map<Path, byte[]> cache = new HashMap<>();
     
-    protected JarInputInterface(Path path) {
+    protected JarFileAccess(Path path) {
+        super(true);
         this.path = path;
         Map<String, String> env = new HashMap<>();
         env.put("create", String.valueOf(Files.notExists(path)));
@@ -69,65 +64,36 @@ public class JarInputInterface extends ClosableChecker implements InputInterface
         }
     }
     
-    public static JarInputInterface of(Path root) throws IOException {
+    public static JarFileAccess of(Path root) throws IOException {
         synchronized (INTERFACES) {
             if (INTERFACES.containsKey(root)) {
                 return INTERFACES.get(root);
             }
             
-            for (Map.Entry<Path, JarInputInterface> entry : INTERFACES.entrySet()) {
+            for (Map.Entry<Path, JarFileAccess> entry : INTERFACES.entrySet()) {
                 if (Files.isSameFile(entry.getKey(), root)) {
                     return entry.getValue();
                 }
             }
             
-            JarInputInterface inputInterface = new JarInputInterface(root);
-            INTERFACES.put(root, inputInterface);
-            return inputInterface;
+            JarFileAccess outputInterface = new JarFileAccess(root);
+            INTERFACES.put(root, outputInterface);
+            return outputInterface;
         }
     }
     
     @Override
-    public void handle(Consumer<String> action) throws IOException {
-        validateCloseState();
-        for (Path root : getFS().getRootDirectories()) {
-            try (Stream<Path> stream = Files.walk(root)) {
-                stream.forEachOrdered(path -> {
-                    if (Files.isDirectory(path)) return;
-                    action.accept(path.toString());
-                });
-            }
-        }
-    }
-    
-    @Override
-    public void handle(BiConsumer<String, byte[]> action) throws IOException {
-        validateCloseState();
-        for (Path root : getFS().getRootDirectories()) {
-            try (Stream<Path> stream = Files.walk(root)) {
-                stream.forEachOrdered(path -> {
-                    if (Files.isDirectory(path)) return;
-                    action.accept(path.toString(), cache.computeIfAbsent(path, p -> {
-                        try {
-                            return Files.readAllBytes(p);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    }));
-                });
-            }
-        }
-        cache.clear();
+    protected Path rootPath() {
+        return getFS().getPath("/");
     }
     
     @Override
     public void close() throws IOException {
-        closeAndValidate();
+        super.close();
         if (shouldCloseFs) {
             Logger.debug("Closing File Systems for " + path);
             fs.close();
         }
-        cache.clear();
         INTERFACES.remove(path, this);
     }
     
@@ -138,7 +104,7 @@ public class JarInputInterface extends ClosableChecker implements InputInterface
                 Map<String, String> env = new HashMap<>();
                 env.put("create", String.valueOf(Files.notExists(path)));
                 URI uri = new URI("jar:" + path.toUri());
-                cache.clear();
+                clearCache();
                 fs = FileSystems.newFileSystem(uri, env);
                 shouldCloseFs = true;
                 return fs;

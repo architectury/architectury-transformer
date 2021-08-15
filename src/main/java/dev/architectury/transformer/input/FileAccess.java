@@ -24,40 +24,42 @@
 package dev.architectury.transformer.input;
 
 import java.io.IOException;
-import java.util.function.BiConsumer;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-public final class NullOutputInterface implements OutputInterface {
-    private static final NullOutputInterface INSTANCE = new NullOutputInterface();
+public interface FileAccess extends FileView {
+    boolean addFile(String path, byte[] bytes) throws IOException;
     
-    private NullOutputInterface() {}
+    byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException;
     
-    public static OutputInterface of() {
-        return INSTANCE;
+    default void modifyFiles(Predicate<String> pathPredicate, BiFunction<String, byte[], byte[]> action) throws IOException {
+        try {
+            handle(path -> {
+                if (pathPredicate.test(path)) {
+                    try {
+                        modifyFile(path, bytes -> action.apply(path, bytes));
+                    } catch (IOException exception) {
+                        throw new UncheckedIOException(exception);
+                    }
+                }
+            });
+        } catch (UncheckedIOException exception) {
+            throw exception.getCause();
+        }
     }
     
-    @Override
-    public boolean addFile(String path, byte[] bytes) throws IOException {
-        return false;
+    default void modifyFiles(BiFunction<String, byte[], byte[]> action) throws IOException {
+        modifyFiles(path -> true, action);
     }
     
-    @Override
-    public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
-        return null;
+    default boolean addFile(String path, String text) throws IOException {
+        return addFile(path, text.getBytes(StandardCharsets.UTF_8));
     }
     
-    @Override
-    public void close() throws IOException {
-        
-    }
-    
-    @Override
-    public void handle(BiConsumer<String, byte[]> action) throws IOException {
-        
-    }
-    
-    @Override
-    public boolean isClosed() {
-        return false;
+    default boolean addClass(String path, byte[] bytes) throws IOException {
+        return addFile(path + ".class", bytes);
     }
 }

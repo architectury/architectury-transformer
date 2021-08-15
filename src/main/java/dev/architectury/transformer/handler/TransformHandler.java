@@ -24,7 +24,7 @@
 package dev.architectury.transformer.handler;
 
 import dev.architectury.transformer.Transformer;
-import dev.architectury.transformer.input.OutputInterface;
+import dev.architectury.transformer.input.FileAccess;
 
 import java.io.Closeable;
 import java.util.List;
@@ -34,5 +34,5 @@ public interface TransformHandler extends Closeable {
         return new ThreadLockedTransformHandler(this);
     }
     
-    void handle(String input, OutputInterface output,  List<Transformer> transformers) throws Exception;
+    void handle(String input, FileAccess output,  List<Transformer> transformers) throws Exception;
 }

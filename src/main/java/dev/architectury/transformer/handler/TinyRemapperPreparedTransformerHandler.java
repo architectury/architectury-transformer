@@ -35,8 +35,8 @@ import java.util.Set;
 public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHandler {
     private TinyRemapper remapper;
     
-    public TinyRemapperPreparedTransformerHandler(ReadClasspathProvider classpath, TransformerContext context) throws Exception {
-        super(classpath, context);
+    public TinyRemapperPreparedTransformerHandler(ReadClasspathProvider classpath, TransformerContext context, boolean nested) throws Exception {
+        super(classpath, context, nested);
         prepare();
     }
     

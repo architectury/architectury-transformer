@@ -27,7 +27,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import dev.architectury.transformer.Transform;
-import dev.architectury.transformer.input.OutputInterface;
+import dev.architectury.transformer.input.FileAccess;
 import dev.architectury.transformer.transformers.base.AssetEditTransformer;
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.util.Logger;
@@ -37,10 +37,10 @@ import java.io.InputStreamReader;
 
 public class RuntimeMixinRefmapDetector implements AssetEditTransformer {
     @Override
-    public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
+    public void doEdit(TransformerContext context, FileAccess output) throws Exception {
         Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
         output.handle((path, bytes) -> {
-            String trimmedPath = Transform.stripLoadingSlash(path);
+            String trimmedPath = Transform.trimSlashes(path);
             if (trimmedPath.endsWith(".json") && !trimmedPath.contains("/") && !trimmedPath.contains("\\")) {
                 Logger.debug("Checking whether " + path + " is a mixin config.");
                 try (InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(bytes))) {

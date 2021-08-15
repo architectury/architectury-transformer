@@ -24,29 +24,22 @@
 package dev.architectury.transformer;
 
 import dev.architectury.transformer.handler.SimpleTransformerHandler;
-import dev.architectury.transformer.input.InputInterface;
-import dev.architectury.transformer.input.OpenedOutputInterface;
-import dev.architectury.transformer.input.OutputInterface;
+import dev.architectury.transformer.input.FileAccess;
+import dev.architectury.transformer.input.FileView;
+import dev.architectury.transformer.input.OpenedFileAccess;
 import dev.architectury.transformer.transformers.BuiltinProperties;
 import dev.architectury.transformer.transformers.ClasspathProvider;
 import dev.architectury.transformer.transformers.base.edit.SimpleTransformerContext;
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.transformers.classpath.ReadClasspathProvider;
 import dev.architectury.transformer.util.Logger;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.ClassNode;
-import org.zeroturnaround.zip.commons.IOUtils;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
@@ -55,9 +48,6 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-import java.util.zip.ZipOutputStream;
 
 import static java.util.concurrent.TimeUnit.*;
 
@@ -87,36 +77,31 @@ public class Transform {
         logTime(() -> {
             if (Files.isDirectory(input)) {
                 copyDirectory(input, output);
-                try (OpenedOutputInterface outputInterface = OpenedOutputInterface.ofDirectory(output)) {
+                try (OpenedFileAccess outputInterface = OpenedFileAccess.ofDirectory(output)) {
                     runTransformers(context, classpath, input.toString(), outputInterface, transformers);
                 }
             } else {
                 Files.copy(input, output, StandardCopyOption.REPLACE_EXISTING);
-                try (OpenedOutputInterface outputInterface = OpenedOutputInterface.ofJar(output)) {
+                try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(output)) {
                     runTransformers(context, classpath, input.toString(), outputInterface, transformers);
                 }
             }
         }, "Transformed jar with " + transformers.size() + " transformer(s)");
     }
     
-    public static void runTransformers(TransformerContext context, ClasspathProvider classpath, InputInterface input, OutputInterface output, List<Transformer> transformers)
+    public static void runTransformers(TransformerContext context, ClasspathProvider classpath, String input, FileAccess output, List<Transformer> transformers)
             throws Exception {
         runTransformers(context, ReadClasspathProvider.of(classpath), input, output, transformers);
     }
     
-    public static void runTransformers(TransformerContext context, ClasspathProvider classpath, String input, OutputInterface output, List<Transformer> transformers)
+    public static void runTransformers(TransformerContext context, ReadClasspathProvider classpath, String input, FileAccess output, List<Transformer> transformers)
             throws Exception {
-        runTransformers(context, ReadClasspathProvider.of(classpath), input, output, transformers);
+        runTransformers(context, classpath, input, output, transformers, false);
     }
     
-    public static void runTransformers(TransformerContext context, ReadClasspathProvider classpath, InputInterface input, OutputInterface output, List<Transformer> transformers)
-            throws Exception {
-        runTransformers(context, classpath, input.toString(), output, transformers);
-    }
-    
-    public static void runTransformers(TransformerContext context, ReadClasspathProvider classpath, String input, OutputInterface output, List<Transformer> transformers)
-            throws Exception {
-        try (SimpleTransformerHandler handler = new SimpleTransformerHandler(classpath, context)) {
+    public static void runTransformers(TransformerContext context, ReadClasspathProvider classpath, String input, FileAccess output, List<Transformer> transformers,
+            boolean nested) throws Exception {
+        try (SimpleTransformerHandler handler = new SimpleTransformerHandler(classpath, context, nested)) {
             handler.handle(input, output, transformers);
         }
     }
@@ -135,11 +120,24 @@ public class Transform {
         measured.accept(duration);
     }
     
-    public static String stripLoadingSlash(String string) {
+    public static String trimSlashes(String string) {
+        return string == null ? null : trimLeadingSlash(trimEndingSlash(string));
+    }
+    
+    public static String trimLeadingSlash(String string) {
         if (string.startsWith(File.separator)) {
-            return string.substring(1);
+            return string.substring(File.separator.length());
         } else if (string.startsWith("/")) {
             return string.substring(1);
+        }
+        return string;
+    }
+    
+    public static String trimEndingSlash(String string) {
+        if (string.endsWith(File.separator)) {
+            return string.substring(string.length() - File.separator.length());
+        } else if (string.endsWith("/")) {
+            return string.substring(0, string.length() - 1);
         }
         return string;
     }
@@ -234,84 +232,6 @@ public class Transform {
                 return "d";
             default:
                 throw new AssertionError();
-        }
-    }
-    
-    public static void transform(Path input, Path output, ClassTransformer transformer) throws Exception {
-        output.toFile().delete();
-        
-        if (!Files.exists(input)) {
-            throw new FileNotFoundException(input.toString());
-        }
-        
-        if (input.toFile().isDirectory()) {
-            try (ZipOutputStream zipOutputStream = new ZipOutputStream(Files.newOutputStream(output))) {
-                ClassAdder adder = (className, bytes) -> {
-                    zipOutputStream.putNextEntry(new ZipEntry(className + ".class"));
-                    zipOutputStream.write(bytes);
-                    zipOutputStream.closeEntry();
-                };
-                
-                for (Path path : Files.walk(input).toArray(Path[]::new)) {
-                    byte[] allBytes = Files.readAllBytes(input);
-                    ClassReader reader = new ClassReader(allBytes);
-                    if ((reader.getAccess() & Opcodes.ACC_MODULE) == 0) {
-                        ClassNode node = new ClassNode(Opcodes.ASM8);
-                        reader.accept(node, ClassReader.EXPAND_FRAMES);
-                        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-                        transformer.transform(node, adder).accept(writer);
-                        allBytes = writer.toByteArray();
-                    }
-                    zipOutputStream.putNextEntry(new ZipEntry(path.relativize(input).toString()));
-                    zipOutputStream.write(allBytes);
-                    zipOutputStream.closeEntry();
-                }
-            }
-        } else if (input.toFile().getAbsolutePath().endsWith(".class")) {
-            byte[] allBytes = Files.readAllBytes(input);
-            ClassReader reader = new ClassReader(allBytes);
-            if ((reader.getAccess() & Opcodes.ACC_MODULE) == 0) {
-                ClassNode node = new ClassNode(Opcodes.ASM8);
-                reader.accept(node, ClassReader.EXPAND_FRAMES);
-                ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-                transformer.transform(node, (name, bytes) -> {
-                    File newClassFile = new File(output.toFile().getParentFile(), name + ".class");
-                    newClassFile.delete();
-                    newClassFile.getParentFile().mkdirs();
-                    Files.write(newClassFile.toPath(), bytes, StandardOpenOption.CREATE);
-                }).accept(writer);
-                allBytes = writer.toByteArray();
-            }
-            Files.write(output, allBytes, StandardOpenOption.CREATE);
-        } else {
-            try (ZipOutputStream zipOutputStream = new ZipOutputStream(Files.newOutputStream(output))) {
-                try (ZipInputStream it = new ZipInputStream(Files.newInputStream(input))) {
-                    ClassAdder adder = (className, bytes) -> {
-                        zipOutputStream.putNextEntry(new ZipEntry(className + ".class"));
-                        zipOutputStream.write(bytes);
-                        zipOutputStream.closeEntry();
-                    };
-                    
-                    while (true) {
-                        ZipEntry entry = it.getNextEntry();
-                        if (entry == null) break;
-                        byte[] allBytes = IOUtils.toByteArray(it);
-                        if (entry.getName().endsWith(".class")) {
-                            ClassReader reader = new ClassReader(allBytes);
-                            if ((reader.getAccess() & Opcodes.ACC_MODULE) == 0) {
-                                ClassNode node = new ClassNode(Opcodes.ASM8);
-                                reader.accept(node, ClassReader.EXPAND_FRAMES);
-                                ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-                                transformer.transform(node, adder).accept(writer);
-                                allBytes = writer.toByteArray();
-                            }
-                        }
-                        zipOutputStream.putNextEntry(new ZipEntry(entry.getName()));
-                        zipOutputStream.write(allBytes);
-                        zipOutputStream.closeEntry();
-                    }
-                }
-            }
         }
     }
 }

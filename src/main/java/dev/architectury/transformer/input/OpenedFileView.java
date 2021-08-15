@@ -26,49 +26,39 @@ package dev.architectury.transformer.input;
 import dev.architectury.transformer.util.ClosableChecker;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.UnaryOperator;
 
-public class OpenedOutputInterface extends ClosableChecker implements OutputInterface {
+public class OpenedFileView extends ClosableChecker implements FileView {
     private final Provider provider;
     private Lock lock = new ReentrantLock();
-    private OutputInterface outputInterface;
+    private FileView fileView;
     
-    protected OpenedOutputInterface(Provider provider) {
+    protected OpenedFileView(Provider provider) {
         this.provider = provider;
     }
     
-    public static OpenedOutputInterface of(Provider provider) {
-        return new OpenedOutputInterface(provider);
-    }
-    
-    public static OpenedOutputInterface ofJar(Path path) {
-        return new OpenedOutputInterface(() -> new JarOutputInterface(path));
-    }
-    
-    public static OpenedOutputInterface ofDirectory(Path path) {
-        return new OpenedOutputInterface(() -> new DirectoryOutputInterface(path));
+    public static OpenedFileView of(Provider provider) {
+        return new OpenedFileView(provider);
     }
     
     @FunctionalInterface
     public interface Provider {
-        OutputInterface provide() throws IOException;
+        FileView provide() throws IOException;
     }
     
-    private OutputInterface getParent() throws IOException {
+    private FileView getParent() throws IOException {
         validateCloseState();
         
         try {
             lock.lock();
-            if (outputInterface == null || outputInterface.isClosed()) {
-                return outputInterface = provider.provide();
+            if (fileView == null || fileView.isClosed()) {
+                return fileView = provider.provide();
             }
             
-            return outputInterface;
+            return fileView;
         } finally {
             lock.unlock();
         }
@@ -85,21 +75,11 @@ public class OpenedOutputInterface extends ClosableChecker implements OutputInte
     }
     
     @Override
-    public boolean addFile(String path, byte[] bytes) throws IOException {
-        return getParent().addFile(path, bytes);
-    }
-    
-    @Override
-    public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
-        return getParent().modifyFile(path, action);
-    }
-    
-    @Override
     public void close() throws IOException {
         closeAndValidate();
-        if (outputInterface != null) {
-            outputInterface.close();
+        if (fileView != null) {
+            fileView.close();
         }
-        outputInterface = null;
+        fileView = null;
     }
 }

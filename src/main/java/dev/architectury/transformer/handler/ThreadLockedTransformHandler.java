@@ -24,7 +24,7 @@
 package dev.architectury.transformer.handler;
 
 import dev.architectury.transformer.Transformer;
-import dev.architectury.transformer.input.OutputInterface;
+import dev.architectury.transformer.input.FileAccess;
 
 import java.io.IOException;
 import java.util.List;
@@ -44,7 +44,7 @@ public class ThreadLockedTransformHandler implements TransformHandler {
     }
     
     @Override
-    public void handle(String input, OutputInterface output, List<Transformer> transformers) throws Exception {
+    public void handle(String input, FileAccess output, List<Transformer> transformers) throws Exception {
         lock.lock();
         try {
             this.parent.handle(input, output, transformers);

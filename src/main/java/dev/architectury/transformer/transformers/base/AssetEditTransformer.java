@@ -24,9 +24,9 @@
 package dev.architectury.transformer.transformers.base;
 
 import dev.architectury.transformer.Transformer;
-import dev.architectury.transformer.input.OutputInterface;
+import dev.architectury.transformer.input.FileAccess;
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 
 public interface AssetEditTransformer extends Transformer {
-    void doEdit(TransformerContext context, OutputInterface output) throws Exception;
+    void doEdit(TransformerContext context, FileAccess output) throws Exception;
 }

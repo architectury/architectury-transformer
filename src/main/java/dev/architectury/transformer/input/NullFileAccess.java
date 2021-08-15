@@ -23,40 +23,41 @@
 
 package dev.architectury.transformer.input;
 
-import dev.architectury.transformer.util.Logger;
-
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
-public interface InputInterface extends ClosedIndicator {
-    default void handle(Consumer<String> action) throws IOException {
-        handle((path, bytes) -> action.accept(path));
+public final class NullFileAccess implements FileAccess {
+    private static final NullFileAccess INSTANCE = new NullFileAccess();
+    
+    private NullFileAccess() {}
+    
+    public static FileAccess of() {
+        return INSTANCE;
     }
     
-    void handle(BiConsumer<String, byte[]> action) throws IOException;
-    
-    default void copyTo(OutputInterface output) throws IOException {
-        copyTo(path -> true, output);
+    @Override
+    public boolean addFile(String path, byte[] bytes) throws IOException {
+        return false;
     }
     
-    default void copyTo(Predicate<String> pathPredicate, OutputInterface output) throws IOException {
-        try {
-            handle((path, bytes) -> {
-                try {
-                    if (pathPredicate.test(path)) {
-                        if (!output.addFile(path, bytes)) {
-                            Logger.debug("Failed to copy %s from %s to %s", path, this, output);
-                        }
-                    }
-                } catch (IOException exception) {
-                    throw new UncheckedIOException(exception);
-                }
-            });
-        } catch (UncheckedIOException exception) {
-            throw exception.getCause();
-        }
+    @Override
+    public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
+        return null;
+    }
+    
+    @Override
+    public void close() throws IOException {
+        
+    }
+    
+    @Override
+    public void handle(BiConsumer<String, byte[]> action) throws IOException {
+        
+    }
+    
+    @Override
+    public boolean isClosed() {
+        return false;
     }
 }

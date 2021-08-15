@@ -31,7 +31,7 @@ import dev.architectury.refmapremapper.remapper.MappingsRemapper;
 import dev.architectury.refmapremapper.remapper.Remapper;
 import dev.architectury.refmapremapper.remapper.SimpleReferenceRemapper;
 import dev.architectury.transformer.Transform;
-import dev.architectury.transformer.input.OutputInterface;
+import dev.architectury.transformer.input.FileAccess;
 import dev.architectury.transformer.transformers.base.AssetEditTransformer;
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.util.Logger;
@@ -54,12 +54,12 @@ public class FixForgeMixin implements AssetEditTransformer {
     private Map<String, Mapped> srgMap;
     
     @Override
-    public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
+    public void doEdit(TransformerContext context, FileAccess output) throws Exception {
         Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
         List<String> mixinConfigs = new ArrayList<>();
         String refmap = System.getProperty(BuiltinProperties.REFMAP_NAME);
         output.handle((path, bytes) -> {
-            String trimmedPath = Transform.stripLoadingSlash(path);
+            String trimmedPath = Transform.trimSlashes(path);
             if (trimmedPath.endsWith(".json") && !trimmedPath.contains("/") && !trimmedPath.contains("\\")) {
                 Logger.debug("Checking whether " + path + " is a mixin config.");
                 try (InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(bytes))) {

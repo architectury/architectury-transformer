@@ -21,11 +21,42 @@
  * SOFTWARE.
  */
 
-package dev.architectury.transformer;
+package dev.architectury.transformer.input;
 
-import org.objectweb.asm.tree.ClassNode;
+import dev.architectury.transformer.util.ClosableChecker;
 
-@FunctionalInterface
-public interface ClassTransformer {
-    ClassNode transform(ClassNode clazz, ClassAdder classAdder) throws Exception;
+import java.io.IOException;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+
+public abstract class AbstractFileAccess extends ClosableChecker implements FileAccess {
+    protected FileView fileView;
+    
+    public AbstractFileAccess(FileView fileView) {
+        this.fileView = fileView;
+    }
+    
+    @Override
+    public void handle(Consumer<String> action) throws IOException {
+        validateCloseState();
+        if (fileView != null) {
+            fileView.handle(action);
+        }
+    }
+    
+    @Override
+    public void handle(BiConsumer<String, byte[]> action) throws IOException {
+        validateCloseState();
+        if (fileView != null) {
+            fileView.handle(action);
+        }
+    }
+    
+    @Override
+    public void close() throws IOException {
+        validateCloseState();
+        if (fileView != null) {
+            fileView.close();
+        }
+    }
 }

@@ -26,7 +26,7 @@ package dev.architectury.transformer.transformers;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.gson.JsonObject;
-import dev.architectury.transformer.input.OutputInterface;
+import dev.architectury.transformer.input.FileAccess;
 import dev.architectury.transformer.transformers.base.AssetEditTransformer;
 import dev.architectury.transformer.transformers.base.ClassEditTransformer;
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
@@ -52,7 +52,7 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
     }
     
     @Override
-    public void doEdit(TransformerContext context, OutputInterface output) throws Exception {
+    public void doEdit(TransformerContext context, FileAccess output) throws Exception {
         if (!RemapInjectables.isInjectInjectables()) return;
         String className = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods";
         output.addClass(className, buildPlatformMethodClass(className));

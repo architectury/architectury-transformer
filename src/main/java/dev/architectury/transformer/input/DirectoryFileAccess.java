@@ -23,79 +23,47 @@
 
 package dev.architectury.transformer.input;
 
-import dev.architectury.transformer.util.ClosableChecker;
-
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
 
-public class DirectoryInputInterface extends ClosableChecker implements InputInterface {
-    private static final WeakHashMap<Path, DirectoryInputInterface> INTERFACES = new WeakHashMap<>();
+public class DirectoryFileAccess extends NIOFileAccess {
+    private static final WeakHashMap<Path, DirectoryFileAccess> INTERFACES = new WeakHashMap<>();
     protected final Path root;
-    protected final Map<Path, byte[]> cache = new HashMap<>();
     
-    protected DirectoryInputInterface(Path root) {
+    protected DirectoryFileAccess(Path root) {
+        super(false);
         this.root = root;
     }
     
-    public static DirectoryInputInterface of(Path root) throws IOException {
+    public static DirectoryFileAccess of(Path root) throws IOException {
         synchronized (INTERFACES) {
             if (INTERFACES.containsKey(root)) {
                 return INTERFACES.get(root);
             }
             
-            for (Map.Entry<Path, DirectoryInputInterface> entry : INTERFACES.entrySet()) {
+            for (Map.Entry<Path, DirectoryFileAccess> entry : INTERFACES.entrySet()) {
                 if (Files.isSameFile(entry.getKey(), root)) {
                     return entry.getValue();
                 }
             }
             
-            DirectoryInputInterface inputInterface = new DirectoryInputInterface(root);
-            INTERFACES.put(root, inputInterface);
-            return inputInterface;
+            DirectoryFileAccess outputInterface = new DirectoryFileAccess(root);
+            INTERFACES.put(root, outputInterface);
+            return outputInterface;
         }
     }
     
     @Override
-    public void handle(Consumer<String> action) throws IOException {
-        validateCloseState();
-        try (Stream<Path> stream = Files.walk(root)) {
-            stream.forEachOrdered(path -> {
-                if (Files.isDirectory(path)) return;
-                action.accept(path.toString());
-            });
-        }
-    }
-    
-    @Override
-    public void handle(BiConsumer<String, byte[]> action) throws IOException {
-        validateCloseState();
-        try (Stream<Path> stream = Files.walk(root)) {
-            stream.forEachOrdered(path -> {
-                if (Files.isDirectory(path)) return;
-                action.accept(path.toString(), cache.computeIfAbsent(path, p -> {
-                    try {
-                        return Files.readAllBytes(p);
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                }));
-            });
-        }
-        cache.clear();
+    protected Path rootPath() {
+        return root;
     }
     
     @Override
     public void close() throws IOException {
-        closeAndValidate();
-        cache.clear();
+        super.close();
         INTERFACES.remove(root, this);
     }
     
