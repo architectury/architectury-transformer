@@ -122,11 +122,13 @@ public class SimpleTransformerHandler implements TransformHandler {
             if (transformer instanceof ClassDeleteTransformer) {
                 ClassDeleteTransformer deleter = (ClassDeleteTransformer) transformer;
                 output.deleteFiles((path, bytes) -> {
-                    ClassReader reader = new ClassReader(bytes);
-                    if ((reader.getAccess() & Opcodes.ACC_MODULE) == 0) {
-                        ClassNode node = new ClassNode(Opcodes.ASM8);
-                        reader.accept(node, ClassReader.EXPAND_FRAMES);
-                        return deleter.shouldDelete(path, node);
+                    if (path.endsWith(".class")) {
+                        ClassReader reader = new ClassReader(bytes);
+                        if ((reader.getAccess() & Opcodes.ACC_MODULE) == 0) {
+                            ClassNode node = new ClassNode(Opcodes.ASM8);
+                            reader.accept(node, ClassReader.EXPAND_FRAMES);
+                            return deleter.shouldDelete(path, node);
+                        }
                     }
                     return false;
                 });
