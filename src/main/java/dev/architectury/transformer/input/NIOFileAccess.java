@@ -37,7 +37,12 @@ public abstract class NIOFileAccess extends BaseFileAccess {
         }
         Files.write(p, bytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
-    
+
+    @Override
+    public boolean deleteFile(String path) throws IOException {
+        return Files.deleteIfExists(resolve(path));
+    }
+
     @Override
     protected Stream<String> walk(@Nullable String path) throws IOException {
         return Files.walk(path == null ? rootPath() : resolve(path))

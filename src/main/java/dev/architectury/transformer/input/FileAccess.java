@@ -27,14 +27,17 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 public interface FileAccess extends FileView {
     boolean addFile(String path, byte[] bytes) throws IOException;
-    
+
     byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException;
-    
+
+    boolean deleteFile(String path) throws IOException;
+
     default void modifyFiles(Predicate<String> pathPredicate, BiFunction<String, byte[], byte[]> action) throws IOException {
         try {
             handle(path -> {
@@ -50,16 +53,40 @@ public interface FileAccess extends FileView {
             throw exception.getCause();
         }
     }
-    
+
     default void modifyFiles(BiFunction<String, byte[], byte[]> action) throws IOException {
         modifyFiles(path -> true, action);
     }
-    
+
     default boolean addFile(String path, String text) throws IOException {
         return addFile(path, text.getBytes(StandardCharsets.UTF_8));
     }
-    
+
     default boolean addClass(String path, byte[] bytes) throws IOException {
         return addFile(path + ".class", bytes);
+    }
+
+    default void deleteFiles(BiPredicate<String, byte[]> filePredicate) throws IOException {
+        try {
+            handle((path, bytes) -> {
+                if (filePredicate.test(path, bytes)) {
+                    try {
+                        deleteFile(path);
+                    } catch (IOException exception) {
+                        throw new UncheckedIOException(exception);
+                    }
+                }
+            });
+        } catch (UncheckedIOException exception) {
+            throw exception.getCause();
+        }
+    }
+
+    default void deleteFiles(Predicate<String> pathPredicate) throws IOException {
+        deleteFiles((path, bytes) -> pathPredicate.test(path));
+    }
+
+    default boolean deleteClass(String path) throws IOException {
+        return deleteFile(path + ".class");
     }
 }

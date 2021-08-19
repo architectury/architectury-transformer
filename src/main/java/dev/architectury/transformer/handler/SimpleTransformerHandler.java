@@ -29,6 +29,7 @@ import dev.architectury.transformer.Transformer;
 import dev.architectury.transformer.input.FileAccess;
 import dev.architectury.transformer.input.MemoryFileAccess;
 import dev.architectury.transformer.transformers.base.AssetEditTransformer;
+import dev.architectury.transformer.transformers.base.ClassDeleteTransformer;
 import dev.architectury.transformer.transformers.base.ClassEditTransformer;
 import dev.architectury.transformer.transformers.base.TinyRemapperTransformer;
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
@@ -116,7 +117,22 @@ public class SimpleTransformerHandler implements TransformHandler {
                 }
             });
         }
-        
+
+        for (Transformer transformer : transformers) {
+            if (transformer instanceof ClassDeleteTransformer) {
+                ClassDeleteTransformer deleter = (ClassDeleteTransformer) transformer;
+                output.deleteFiles((path, bytes) -> {
+                    ClassReader reader = new ClassReader(bytes);
+                    if ((reader.getAccess() & Opcodes.ACC_MODULE) == 0) {
+                        ClassNode node = new ClassNode(Opcodes.ASM8);
+                        reader.accept(node, ClassReader.EXPAND_FRAMES);
+                        return deleter.shouldDelete(path, node);
+                    }
+                    return false;
+                });
+            }
+        }
+
         for (Transformer transformer : transformers) {
             if (transformer instanceof AssetEditTransformer) {
                 try {
