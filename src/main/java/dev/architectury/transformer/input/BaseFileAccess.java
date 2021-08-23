@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public abstract class BaseFileAccess extends ClosableChecker implements FileAccess {
@@ -51,7 +52,9 @@ public abstract class BaseFileAccess extends ClosableChecker implements FileAcce
     public void handle(Consumer<String> action) throws IOException {
         validateCloseState();
         try (Stream<String> stream = walk(null)) {
-            stream.forEachOrdered(action);
+            for (String path : stream.collect(Collectors.toList())) {
+                action.accept(path);
+            }
         }
     }
     
@@ -75,9 +78,9 @@ public abstract class BaseFileAccess extends ClosableChecker implements FileAcce
     public void handle(BiConsumer<String, byte[]> action) throws IOException {
         validateCloseState();
         try (Stream<String> stream = walk(null)) {
-            stream.forEachOrdered(path -> {
+            for (String path : stream.collect(Collectors.toList())) {
                 action.accept(path, cacheRead(path));
-            });
+            }
         }
     }
     
@@ -91,6 +94,11 @@ public abstract class BaseFileAccess extends ClosableChecker implements FileAcce
     }
     
     @Override
+    public byte[] modifyFile(String path, byte[] bytes) throws IOException {
+        return addFile(path, bytes) ? bytes : null;
+    }
+    
+    @Override
     public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
         validateCloseState();
         
@@ -101,8 +109,7 @@ public abstract class BaseFileAccess extends ClosableChecker implements FileAcce
             } catch (Exception e) {
                 throw new RuntimeException("Failed to modify " + path, e);
             }
-            addFile(path, bytes);
-            return bytes;
+            return modifyFile(path, bytes);
         }
         
         return null;

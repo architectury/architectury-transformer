@@ -74,7 +74,7 @@ public class TransformForgeAnnotations implements ClassEditTransformer {
                 }
                 // if @ForgeEventCancellable, add the cancellable annotation from forge
                 if ((node.visibleAnnotations.stream().anyMatch(annotation -> Objects.equals(annotation.desc, FORGE_EVENT_CANCELLABLE_LEGACY))
-                    || node.visibleAnnotations.stream().anyMatch(annotation -> Objects.equals(annotation.desc, FORGE_EVENT_CANCELLABLE))) &&
+                     || node.visibleAnnotations.stream().anyMatch(annotation -> Objects.equals(annotation.desc, FORGE_EVENT_CANCELLABLE))) &&
                     node.visibleAnnotations.stream().noneMatch(annotation -> Objects.equals(annotation.desc, CANCELABLE))) {
                     node.visibleAnnotations.add(new AnnotationNode(CANCELABLE));
                 }

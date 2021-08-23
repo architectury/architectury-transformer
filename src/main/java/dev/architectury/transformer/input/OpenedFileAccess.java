@@ -90,15 +90,20 @@ public class OpenedFileAccess extends ClosableChecker implements FileAccess {
     }
     
     @Override
+    public byte[] modifyFile(String path, byte[] bytes) throws IOException {
+        return getParent().modifyFile(path, bytes);
+    }
+    
+    @Override
     public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
         return getParent().modifyFile(path, action);
     }
-
+    
     @Override
     public boolean deleteFile(String path) throws IOException {
         return getParent().deleteFile(path);
     }
-
+    
     @Override
     public void close() throws IOException {
         closeAndValidate();

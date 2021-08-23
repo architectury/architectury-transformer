@@ -27,7 +27,10 @@ import dev.architectury.transformer.agent.TransformerAgent;
 import dev.architectury.transformer.handler.SimpleTransformerHandler;
 import dev.architectury.transformer.handler.TinyRemapperPreparedTransformerHandler;
 import dev.architectury.transformer.handler.TransformHandler;
-import dev.architectury.transformer.input.*;
+import dev.architectury.transformer.input.AbstractFileAccess;
+import dev.architectury.transformer.input.DirectoryFileAccess;
+import dev.architectury.transformer.input.FileAccess;
+import dev.architectury.transformer.input.OpenedFileAccess;
 import dev.architectury.transformer.transformers.BuiltinProperties;
 import dev.architectury.transformer.transformers.ClasspathProvider;
 import dev.architectury.transformer.transformers.base.edit.SimpleTransformerContext;
@@ -152,16 +155,20 @@ public class TransformerRuntime {
                         }
                         
                         @Override
-                        public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
-                            byte[] bytes = outputInterface.modifyFile(stripLeadingSlash.apply(path), action);
-                            
+                        public byte[] modifyFile(String path, byte[] bytes) throws IOException {
                             if (debugOut != null && bytes != null) {
-                                debugOut.addFile(stripLeadingSlash.apply(path), bytes);
+                                return debugOut.modifyFile(stripLeadingSlash.apply(path), bytes);
                             }
                             
-                            return bytes;
+                            return null;
                         }
-
+                        
+                        @Override
+                        public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
+                            byte[] bytes = outputInterface.modifyFile(stripLeadingSlash.apply(path), action);
+                            return modifyFile(path, bytes);
+                        }
+                        
                         @Override
                         public boolean deleteFile(String path) throws IOException {
                             String s = stripLeadingSlash.apply(path);
@@ -170,7 +177,7 @@ public class TransformerRuntime {
                             }
                             return outputInterface.deleteFile(s) && (debugOut == null || debugOut.deleteFile(s));
                         }
-
+                        
                         @Override
                         public String toString() {
                             return outputInterface.toString();
@@ -218,9 +225,7 @@ public class TransformerRuntime {
                             }
                             
                             @Override
-                            public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
-                                byte[] bytes = outputInterface.modifyFile(stripLeadingSlash.apply(path), action);
-                                
+                            public byte[] modifyFile(String path, byte[] bytes) throws IOException {
                                 if (bytes != null) {
                                     if (debugOut != null) {
                                         debugOut.addFile(stripLeadingSlash.apply(path), bytes);
@@ -239,7 +244,13 @@ public class TransformerRuntime {
                                 
                                 return bytes;
                             }
-
+                            
+                            @Override
+                            public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
+                                byte[] bytes = outputInterface.modifyFile(stripLeadingSlash.apply(path), action);
+                                return modifyFile(path, bytes);
+                            }
+                            
                             @Override
                             public boolean deleteFile(String path) throws IOException {
                                 String s = stripLeadingSlash.apply(path);
@@ -249,12 +260,12 @@ public class TransformerRuntime {
                                         classRedefineCache.remove(s);
                                         redefine.remove(s);
                                     }
-
+                                    
                                     return true;
                                 }
                                 return false;
                             }
-
+                            
                             @Override
                             public String toString() {
                                 return fileView.toString();
@@ -379,6 +390,16 @@ public class TransformerRuntime {
                                 }
                                 
                                 @Override
+                                public byte[] modifyFile(String path, byte[] bytes) throws IOException {
+                                    if (Transform.trimSlashes(path).equals(className + ".class")) {
+                                        classBytes.set(bytes);
+                                        return bytes;
+                                    }
+                                    
+                                    return null;
+                                }
+                                
+                                @Override
                                 public byte[] modifyFile(String path, UnaryOperator<byte[]> action) {
                                     if (Transform.trimSlashes(path).equals(className + ".class")) {
                                         classBytes.set(action.apply(classBytes.get()));
@@ -387,12 +408,12 @@ public class TransformerRuntime {
                                     
                                     return null;
                                 }
-
+                                
                                 @Override
                                 public boolean deleteFile(String path) {
                                     return false;
                                 }
-
+                                
                                 @Override
                                 public String toString() {
                                     return className + ".class";

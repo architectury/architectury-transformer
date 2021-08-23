@@ -34,5 +34,5 @@ public interface TransformHandler extends Closeable {
         return new ThreadLockedTransformHandler(this);
     }
     
-    void handle(String input, FileAccess output,  List<Transformer> transformers) throws Exception;
+    void handle(String input, FileAccess output, List<Transformer> transformers) throws Exception;
 }

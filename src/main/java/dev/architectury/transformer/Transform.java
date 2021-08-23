@@ -25,7 +25,6 @@ package dev.architectury.transformer;
 
 import dev.architectury.transformer.handler.SimpleTransformerHandler;
 import dev.architectury.transformer.input.FileAccess;
-import dev.architectury.transformer.input.FileView;
 import dev.architectury.transformer.input.OpenedFileAccess;
 import dev.architectury.transformer.transformers.BuiltinProperties;
 import dev.architectury.transformer.transformers.ClasspathProvider;

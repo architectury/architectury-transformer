@@ -42,15 +42,20 @@ public final class NullFileAccess implements FileAccess {
     }
     
     @Override
+    public byte[] modifyFile(String path, byte[] bytes) throws IOException {
+        return null;
+    }
+    
+    @Override
     public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
         return null;
     }
-
+    
     @Override
     public boolean deleteFile(String path) throws IOException {
         return false;
     }
-
+    
     @Override
     public void close() throws IOException {
         

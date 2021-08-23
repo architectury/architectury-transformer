@@ -85,7 +85,7 @@ public class MemoryFileAccess extends BaseFileAccess {
     protected void write(String path, byte[] bytes) throws IOException {
         data.put(format(path), bytes);
     }
-
+    
     @Override
     public boolean deleteFile(String path) throws IOException {
         return data.remove(format(path)) != null;

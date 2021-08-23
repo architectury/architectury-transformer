@@ -38,7 +38,7 @@ public interface FileView extends ClosedIndicator {
     default void handle(Consumer<String> action) throws IOException {
         handle((path, bytes) -> action.accept(path));
     }
-
+    
     default void handle(Predicate<String> pathPredicate, BiConsumer<String, byte[]> action) throws IOException {
         handle((path, bytes) -> {
             if (pathPredicate.test(path)) {

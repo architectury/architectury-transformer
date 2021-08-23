@@ -29,5 +29,6 @@ public interface ReadClasspathProvider {
     static ReadClasspathProvider of(ClasspathProvider provider) {
         return new ReadClasspathProviderImpl(provider.logging());
     }
+    
     byte[][] provide();
 }

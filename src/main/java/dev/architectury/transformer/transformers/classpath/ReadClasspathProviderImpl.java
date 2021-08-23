@@ -76,7 +76,7 @@ public class ReadClasspathProviderImpl implements ReadClasspathProvider {
                         List<byte[]> bytes = future.get(60, TimeUnit.SECONDS);
                         classpaths = bytes.toArray(new byte[0][0]);
                         threadPool.awaitTermination(0, TimeUnit.SECONDS);
-    
+                        
                         for (FileSystem system : fsToClose) {
                             FileSystemHandler.close(system);
                         }
@@ -102,7 +102,7 @@ public class ReadClasspathProviderImpl implements ReadClasspathProvider {
             }, service);
         } else if (isParentLevel && (path.toString().endsWith(".zip") || path.toString().endsWith(".jar"))) {
             try {
-                URI uri = new URI("jar:" + path.toUri().toString());
+                URI uri = new URI("jar:" + path.toUri());
                 FileSystem fs = FileSystemHandler.open(uri);
                 fsToClose.add(fs);
                 List<CompletableFuture<List<byte[]>>> futures = new ArrayList<>();

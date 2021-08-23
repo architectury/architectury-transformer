@@ -62,9 +62,9 @@ public class SimpleTransformerHandler implements TransformHandler {
     public void handle(String input, FileAccess output, List<Transformer> transformers) throws Exception {
         if (closed) throw new IllegalStateException("Cannot transform when the handler is closed already!");
         Logger.debug("Transforming from " + input + " to " + output + " with " + transformers.size() + " transformer(s) on " + getClass().getName());
-
+        
         final Set<IMappingProvider> mappingProviders = collectMappings(transformers);
-
+        
         if (!mappingProviders.isEmpty()) {
             Logger.debug("Remapping with " + mappingProviders.size() + " mapping provider(s):");
             for (IMappingProvider provider : mappingProviders) {
@@ -72,22 +72,21 @@ public class SimpleTransformerHandler implements TransformHandler {
             }
             remapTR(mappingProviders, input, output);
         }
-
+        
         if (Logger.isVerbose()) {
             if (anyTransformerModifiesClass(transformers)) {
                 Logger.debug("Found class transformer");
+                output.handle(path -> path.endsWith(".class"), (path, bytes) -> {
+                    try {
+                        applyTransforms(transformers, path, bytes, output);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                });
             } else {
                 Logger.debug("No class transformer");
             }
         }
-
-        output.handle(path -> path.endsWith(".class"), (path, bytes) -> {
-            try {
-                applyTransforms(transformers, path, bytes, output);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
         
         if (nested) {
             output.modifyFiles(path -> path.endsWith(".jar"), (path, bytes) -> {
@@ -101,13 +100,13 @@ public class SimpleTransformerHandler implements TransformHandler {
                 }
             });
         }
-
+        
         editFiles(transformers, output);
     }
-
+    
     private Set<IMappingProvider> collectMappings(List<Transformer> transformers) throws Exception {
         final Set<IMappingProvider> mappings = new HashSet<>();
-
+        
         for (Transformer transformer : transformers) {
             if (transformer instanceof TinyRemapperTransformer) {
                 mappings.addAll(((TinyRemapperTransformer) transformer).collectMappings());
@@ -115,7 +114,7 @@ public class SimpleTransformerHandler implements TransformHandler {
         }
         return mappings;
     }
-
+    
     private void remapTR(Set<IMappingProvider> mappingProviders, String input, FileAccess output) throws Exception {
         TinyRemapper remapper = getRemapper(mappingProviders);
         
@@ -142,7 +141,7 @@ public class SimpleTransformerHandler implements TransformHandler {
             closeRemapper(remapper);
         }
     }
-
+    
     private void debugRemapper(TinyRemapper remapper) throws Exception {
         Field classMapField = remapper.getClass().getDeclaredField("classMap");
         classMapField.setAccessible(true);
@@ -167,7 +166,7 @@ public class SimpleTransformerHandler implements TransformHandler {
     protected void closeRemapper(TinyRemapper remapper) throws Exception {
         remapper.finish();
     }
-
+    
     private boolean anyTransformerModifiesClass(List<Transformer> transformers) {
         for (Transformer transformer : transformers) {
             if (transformer instanceof ClassEditTransformer || transformer instanceof ClassDeleteTransformer) {
@@ -176,21 +175,22 @@ public class SimpleTransformerHandler implements TransformHandler {
         }
         return false;
     }
-
+    
     private void applyTransforms(List<Transformer> transformers, String path, byte[] bytes, FileAccess output) throws IOException {
         ClassReader reader = new ClassReader(bytes);
         if ((reader.getAccess() & Opcodes.ACC_MODULE) == 0) {
             ClassNode node = new ClassNode(Opcodes.ASM8);
             reader.accept(node, ClassReader.EXPAND_FRAMES);
-
+            
             if (shouldDelete(transformers, path, node)) {
                 output.deleteFile(path);
                 return;
             }
-            output.modifyFile(path, b -> toByteArray(editNode(transformers, path, node)));
+            
+            output.modifyFile(path, toByteArray(editNode(transformers, path, node)));
         }
     }
-
+    
     private boolean shouldDelete(List<Transformer> transformers, String path, ClassNode node) {
         for (Transformer transformer : transformers) {
             if (transformer instanceof ClassDeleteTransformer) {
@@ -201,22 +201,23 @@ public class SimpleTransformerHandler implements TransformHandler {
         }
         return false;
     }
-
+    
     private ClassNode editNode(List<Transformer> transformers, String path, ClassNode node) {
         for (Transformer transformer : transformers) {
             if (transformer instanceof ClassEditTransformer) {
                 node = Objects.requireNonNull(((ClassEditTransformer) transformer).doEdit(path, node));
             }
         }
+        
         return node;
     }
-
+    
     private byte[] toByteArray(ClassNode node) {
         final ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         node.accept(writer);
         return writer.toByteArray();
     }
-
+    
     private void editFiles(List<Transformer> transformers, FileAccess output) {
         for (Transformer transformer : transformers) {
             if (transformer instanceof AssetEditTransformer) {
