@@ -109,7 +109,7 @@ public class TransformerRuntime {
                 try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(entry.getPath())) {
                     outputInterface.handle(path -> {
                         String key = stripLeadingSlash.apply(path);
-                        CLASSES_TO_TRANSFORM.put(stripLeadingSlash.apply(path), new AbstractMap.SimpleEntry<>(entry.getTransformers(), debugOut));
+                        CLASSES_TO_TRANSFORM.put(key, new AbstractMap.SimpleEntry<>(entry.getTransformers(), debugOut));
                     });
                 }
             }
@@ -161,7 +161,16 @@ public class TransformerRuntime {
                             
                             return bytes;
                         }
-                        
+
+                        @Override
+                        public boolean deleteFile(String path) throws IOException {
+                            String s = stripLeadingSlash.apply(path);
+                            if (s.endsWith(".class")) {
+                                classRedefineCache.remove(s.substring(0, s.length() - 6));
+                            }
+                            return outputInterface.deleteFile(s) && (debugOut == null || debugOut.deleteFile(s));
+                        }
+
                         @Override
                         public String toString() {
                             return outputInterface.toString();
@@ -230,7 +239,22 @@ public class TransformerRuntime {
                                 
                                 return bytes;
                             }
-                            
+
+                            @Override
+                            public boolean deleteFile(String path) throws IOException {
+                                String s = stripLeadingSlash.apply(path);
+                                if (outputInterface.deleteFile(s) && (debugOut == null || debugOut.deleteFile(s))) {
+                                    if (path.endsWith(".class")) {
+                                        s = s.substring(0, s.length() - 6);
+                                        classRedefineCache.remove(s);
+                                        redefine.remove(s);
+                                    }
+
+                                    return true;
+                                }
+                                return false;
+                            }
+
                             @Override
                             public String toString() {
                                 return fileView.toString();
@@ -363,7 +387,12 @@ public class TransformerRuntime {
                                     
                                     return null;
                                 }
-                                
+
+                                @Override
+                                public boolean deleteFile(String path) {
+                                    return false;
+                                }
+
                                 @Override
                                 public String toString() {
                                     return className + ".class";

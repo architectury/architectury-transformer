@@ -35,7 +35,7 @@ import java.util.function.UnaryOperator;
 
 public class OpenedFileAccess extends ClosableChecker implements FileAccess {
     private final Provider provider;
-    private Lock lock = new ReentrantLock();
+    private final Lock lock = new ReentrantLock();
     private FileAccess fileAccess;
     
     protected OpenedFileAccess(Provider provider) {
@@ -93,7 +93,12 @@ public class OpenedFileAccess extends ClosableChecker implements FileAccess {
     public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
         return getParent().modifyFile(path, action);
     }
-    
+
+    @Override
+    public boolean deleteFile(String path) throws IOException {
+        return getParent().deleteFile(path);
+    }
+
     @Override
     public void close() throws IOException {
         closeAndValidate();

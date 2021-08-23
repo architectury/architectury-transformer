@@ -21,48 +21,11 @@
  * SOFTWARE.
  */
 
-package dev.architectury.transformer.input;
+package dev.architectury.transformer.transformers.base;
 
-import java.io.IOException;
-import java.util.function.BiConsumer;
-import java.util.function.UnaryOperator;
+import dev.architectury.transformer.Transformer;
+import org.objectweb.asm.tree.ClassNode;
 
-public final class NullFileAccess implements FileAccess {
-    private static final NullFileAccess INSTANCE = new NullFileAccess();
-    
-    private NullFileAccess() {}
-    
-    public static FileAccess of() {
-        return INSTANCE;
-    }
-    
-    @Override
-    public boolean addFile(String path, byte[] bytes) throws IOException {
-        return false;
-    }
-    
-    @Override
-    public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
-        return null;
-    }
-
-    @Override
-    public boolean deleteFile(String path) throws IOException {
-        return false;
-    }
-
-    @Override
-    public void close() throws IOException {
-        
-    }
-    
-    @Override
-    public void handle(BiConsumer<String, byte[]> action) throws IOException {
-        
-    }
-    
-    @Override
-    public boolean isClosed() {
-        return false;
-    }
+public interface ClassDeleteTransformer extends Transformer {
+    boolean shouldDelete(String name, ClassNode node);
 }

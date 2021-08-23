@@ -86,7 +86,7 @@ public class Logger {
         debug(String.format(str, args));
     }
     
-    private static boolean isVerbose() {
+    public static boolean isVerbose() {
         if (verbose == null) {
             verbose = System.getProperty(BuiltinProperties.VERBOSE, "false").equals("true");
         }
