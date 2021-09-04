@@ -73,19 +73,17 @@ public class SimpleTransformerHandler implements TransformHandler {
             remapTR(mappingProviders, input, output);
         }
         
-        if (Logger.isVerbose()) {
-            if (anyTransformerModifiesClass(transformers)) {
-                Logger.debug("Found class transformer");
-                output.handle(path -> path.endsWith(".class"), (path, bytes) -> {
-                    try {
-                        applyTransforms(transformers, path, bytes, output);
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                });
-            } else {
-                Logger.debug("No class transformer");
-            }
+        if (anyTransformerModifiesClass(transformers)) {
+            Logger.debug("Found class transformer");
+            output.handle(path -> path.endsWith(".class"), (path, bytes) -> {
+                try {
+                    applyTransforms(transformers, path, bytes, output);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        } else {
+            Logger.debug("No class transformer");
         }
         
         if (nested) {
