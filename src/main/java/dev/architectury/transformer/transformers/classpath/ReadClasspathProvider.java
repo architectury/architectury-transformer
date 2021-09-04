@@ -31,4 +31,6 @@ public interface ReadClasspathProvider {
     }
     
     byte[][] provide();
+    
+    int indexOf(String type);
 }

@@ -185,7 +185,7 @@ public class SimpleTransformerHandler implements TransformHandler {
                 return;
             }
             
-            output.modifyFile(path, toByteArray(editNode(transformers, path, node)));
+            output.modifyFile(path, toByteArray(output, editNode(transformers, path, node)));
         }
     }
     
@@ -210,8 +210,8 @@ public class SimpleTransformerHandler implements TransformHandler {
         return node;
     }
     
-    private byte[] toByteArray(ClassNode node) {
-        final ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+    private byte[] toByteArray(FileAccess output, ClassNode node) {
+        final ClassWriter writer = new TransformerClassWriter(classpath, output, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         node.accept(writer);
         return writer.toByteArray();
     }

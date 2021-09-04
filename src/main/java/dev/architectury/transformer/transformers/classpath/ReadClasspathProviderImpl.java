@@ -33,10 +33,7 @@ import java.net.URISyntaxException;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -45,6 +42,7 @@ import java.util.stream.Collectors;
 
 public class ReadClasspathProviderImpl implements ReadClasspathProvider {
     private final ClasspathProvider provider;
+    private Map<String, Integer> map = new HashMap<>();
     private byte[][] classpaths;
     
     public ReadClasspathProviderImpl(ClasspathProvider provider) {
@@ -55,26 +53,29 @@ public class ReadClasspathProviderImpl implements ReadClasspathProvider {
     public byte[][] provide() {
         synchronized (this) {
             if (classpaths == null) {
-                
+                map.clear();
                 try {
                     Transform.logTime(() -> {
                         ExecutorService threadPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-                        List<CompletableFuture<List<byte[]>>> futures = new ArrayList<>();
+                        List<CompletableFuture<List<Map.Entry<String, byte[]>>>> futures = new ArrayList<>();
                         List<FileSystem> fsToClose = Collections.synchronizedList(new ArrayList<>());
                         
                         for (Path path : provider.provide()) {
                             futures.add(read(path, threadPool, fsToClose, true));
                         }
                         
-                        CompletableFuture<List<byte[]>> future = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                        CompletableFuture<List<Map.Entry<String, byte[]>>> future = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                                 .thenApply(unused -> futures
                                         .stream()
                                         .map(CompletableFuture::join)
                                         .flatMap(Collection::stream)
                                         .collect(Collectors.toList()));
                         
-                        List<byte[]> bytes = future.get(60, TimeUnit.SECONDS);
-                        classpaths = bytes.toArray(new byte[0][0]);
+                        List<Map.Entry<String, byte[]>> bytes = future.get(60, TimeUnit.SECONDS);
+                        int[] i = {0};
+                        classpaths = bytes.stream().peek(entry -> {
+                            map.put(Transform.trimLeadingSlash(entry.getKey()), i[0]++);
+                        }).map(Map.Entry::getValue).toArray(byte[][]::new);
                         threadPool.awaitTermination(0, TimeUnit.SECONDS);
                         
                         for (FileSystem system : fsToClose) {
@@ -90,11 +91,19 @@ public class ReadClasspathProviderImpl implements ReadClasspathProvider {
         }
     }
     
-    private static CompletableFuture<List<byte[]>> read(Path path, ExecutorService service, List<FileSystem> fsToClose, boolean isParentLevel) {
+    @Override
+    public int indexOf(String type) {
+        provide();
+        return map.getOrDefault(type, -1);
+    }
+    
+    private CompletableFuture<List<Map.Entry<String, byte[]>>> read(Path path, ExecutorService service, List<FileSystem> fsToClose, boolean isParentLevel) {
         if (path.toString().endsWith(".class")) {
             return CompletableFuture.supplyAsync(() -> {
                 try {
-                    return Collections.singletonList(Files.readAllBytes(path));
+                    byte[] bytes = Files.readAllBytes(path);
+                    String s = path.toString();
+                    return Collections.singletonList(new AbstractMap.SimpleImmutableEntry<>(s.substring(0, s.length() - 6), bytes));
                 } catch (IOException exception) {
                     exception.printStackTrace();
                 }
@@ -105,7 +114,7 @@ public class ReadClasspathProviderImpl implements ReadClasspathProvider {
                 URI uri = new URI("jar:" + path.toUri());
                 FileSystem fs = FileSystemHandler.open(uri);
                 fsToClose.add(fs);
-                List<CompletableFuture<List<byte[]>>> futures = new ArrayList<>();
+                List<CompletableFuture<List<Map.Entry<String, byte[]>>>> futures = new ArrayList<>();
                 Files.walk(fs.getPath("/")).forEach(f -> {
                     futures.add(read(f, service, fsToClose, false));
                 });
