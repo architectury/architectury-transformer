@@ -23,9 +23,9 @@
 
 package dev.architectury.transformer.input;
 
+import com.google.common.io.ByteStreams;
 import dev.architectury.transformer.Transform;
 import org.jetbrains.annotations.Nullable;
-import org.zeroturnaround.zip.commons.IOUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
@@ -58,7 +58,7 @@ public class MemoryFileAccess extends BaseFileAccess {
             ZipEntry e;
             while ((e = zis.getNextEntry()) != null) {
                 if (!Transform.trimSlashes(e.getName()).isEmpty()) {
-                    anInterface.addFile(e.getName(), IOUtils.toByteArray(zis));
+                    anInterface.addFile(e.getName(), ByteStreams.toByteArray(zis));
                 }
             }
         }
