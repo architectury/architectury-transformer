@@ -27,9 +27,9 @@ import dev.architectury.transformer.agent.TransformerAgent;
 import dev.architectury.transformer.handler.SimpleTransformerHandler;
 import dev.architectury.transformer.handler.TinyRemapperPreparedTransformerHandler;
 import dev.architectury.transformer.handler.TransformHandler;
-import dev.architectury.transformer.input.AbstractFileAccess;
 import dev.architectury.transformer.input.DirectoryFileAccess;
 import dev.architectury.transformer.input.FileAccess;
+import dev.architectury.transformer.input.MemoryFileAccess;
 import dev.architectury.transformer.input.OpenedFileAccess;
 import dev.architectury.transformer.transformers.BuiltinProperties;
 import dev.architectury.transformer.transformers.ClasspathProvider;
@@ -37,13 +37,11 @@ import dev.architectury.transformer.transformers.base.edit.SimpleTransformerCont
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.transformers.classpath.ReadClasspathProvider;
 import dev.architectury.transformer.transformers.properties.TransformersReader;
-import dev.architectury.transformer.util.HashUtils;
 import dev.architectury.transformer.util.Logger;
 import dev.architectury.transformer.util.TransformerPair;
 
 import java.io.*;
 import java.lang.instrument.ClassDefinition;
-import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -55,29 +53,47 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.ProtectionDomain;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.UnaryOperator;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
-
-import static dev.architectury.transformer.Transform.formatDuration;
 
 public class TransformerRuntime {
     public static final String RUNTIME_TRANSFORM_CONFIG = "architectury.runtime.transformer";
     public static final String MAIN_CLASS = "architectury.main.class";
     public static final String PROPERTIES = "architectury.properties";
     public static final Set<File> TRANSFORM_FILES = new HashSet<>();
-    public static final Map<String, Map.Entry<List<Transformer>, DirectoryFileAccess>> CLASSES_TO_TRANSFORM = new HashMap<>();
+    public static final Map<String, ToTransformData> CLASSES_TO_TRANSFORM = new HashMap<>();
     private static ReadClasspathProvider classpathProvider;
     
     private static boolean isDebugOutputEnabled() {
         return System.getProperty(BuiltinProperties.DEBUG_OUTPUT, "false").equals("true");
+    }
+    
+    public static class ToTransformData {
+        private final List<Transformer> transformers;
+        private final FileAccess originalSource;
+        private final FileAccess debugOut;
+        
+        public ToTransformData(List<Transformer> transformers, FileAccess originalSource, FileAccess debugOut) {
+            this.transformers = transformers;
+            this.originalSource = originalSource;
+            this.debugOut = debugOut;
+        }
+        
+        public List<Transformer> getTransformers() {
+            return transformers;
+        }
+        
+        public FileAccess getOriginalSource() {
+            return originalSource;
+        }
+        
+        public FileAccess getDebugOut() {
+            return debugOut;
+        }
     }
     
     public static void main(String[] args) throws Throwable {
@@ -90,7 +106,6 @@ public class TransformerRuntime {
         String configText = new String(Files.readAllBytes(configPath), StandardCharsets.UTF_8);
         List<PathWithTransformersEntry> toTransform = parsePathWithTransformersEntries(configText);
         
-        UnaryOperator<String> stripLeadingSlash = Transform::trimSlashes;
         AtomicInteger i = new AtomicInteger();
         Map<Path, DirectoryFileAccess> debugOuts = new ConcurrentHashMap<>();
         for (PathWithTransformersEntry entry : toTransform) {
@@ -105,14 +120,19 @@ public class TransformerRuntime {
             }) : null;
             TRANSFORM_FILES.add(entry.toFile().getAbsoluteFile());
             if (Files.isDirectory(entry.getPath())) {
-                Files.walk(entry.getPath()).forEach(path -> {
-                    CLASSES_TO_TRANSFORM.put(stripLeadingSlash.apply(entry.getPath().relativize(path).toString()), new AbstractMap.SimpleEntry<>(entry.getTransformers(), debugOut));
-                });
+                try (OpenedFileAccess outputInterface = OpenedFileAccess.ofDirectory(entry.getPath())) {
+                    MemoryFileAccess remember = outputInterface.remember();
+                    outputInterface.handle(path -> {
+                        String key = Transform.trimSlashes(path);
+                        CLASSES_TO_TRANSFORM.put(key, new ToTransformData(entry.getTransformers(), remember, debugOut));
+                    });
+                }
             } else {
                 try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(entry.getPath())) {
+                    MemoryFileAccess remember = outputInterface.remember();
                     outputInterface.handle(path -> {
-                        String key = stripLeadingSlash.apply(path);
-                        CLASSES_TO_TRANSFORM.put(key, new AbstractMap.SimpleEntry<>(entry.getTransformers(), debugOut));
+                        String key = Transform.trimSlashes(path);
+                        CLASSES_TO_TRANSFORM.put(key, new ToTransformData(entry.getTransformers(), remember, debugOut));
                     });
                 }
             }
@@ -136,148 +156,37 @@ public class TransformerRuntime {
             Files.deleteIfExists(tmpJar);
             Files.copy(entry.getPath(), tmpJar);
             try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(tmpJar)) {
-                try (OpenedFileAccess inputInterface = OpenedFileAccess.ofJar(entry.getPath())) {
-                    Logger.debug("Transforming " + entry.getTransformers().size() + " transformer(s) from " + entry.getPath().toString() + " to " + tmpJar + ": ");
-                    for (Transformer transformer : entry.getTransformers()) {
-                        Logger.debug(" - " + transformer.toString());
-                    }
-                    Transform.runTransformers(new SimpleTransformerContext(a -> {
-                        argsList.addAll(Arrays.asList(a));
-                        Logger.debug("Appended Launch Argument: " + Arrays.toString(a));
-                    }, false, true, true), classpathProvider, entry.getPath().toString(), new AbstractFileAccess(inputInterface) {
-                        @Override
-                        public boolean addFile(String path, byte[] bytes) throws IOException {
-                            String s = stripLeadingSlash.apply(path);
-                            if (s.endsWith(".class")) {
-                                classRedefineCache.put(s.substring(0, s.length() - 6), HashUtils.sha256(bytes));
-                            }
-                            return outputInterface.addFile(s, bytes) && (debugOut == null || debugOut.addFile(s, bytes));
-                        }
-                        
-                        @Override
-                        public byte[] modifyFile(String path, byte[] bytes) throws IOException {
-                            if (debugOut != null && bytes != null) {
-                                return debugOut.modifyFile(stripLeadingSlash.apply(path), bytes);
-                            }
-                            
-                            return null;
-                        }
-                        
-                        @Override
-                        public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
-                            byte[] bytes = outputInterface.modifyFile(stripLeadingSlash.apply(path), action);
-                            return modifyFile(path, bytes);
-                        }
-                        
-                        @Override
-                        public boolean deleteFile(String path) throws IOException {
-                            String s = stripLeadingSlash.apply(path);
-                            if (s.endsWith(".class")) {
-                                classRedefineCache.remove(s.substring(0, s.length() - 6));
-                            }
-                            return outputInterface.deleteFile(s) && (debugOut == null || debugOut.deleteFile(s));
-                        }
-                        
-                        @Override
-                        public String toString() {
-                            return outputInterface.toString();
-                        }
-                        
-                        @Override
-                        public void close() {
-                        }
-                    }, entry.getTransformers());
+                Logger.debug("Transforming " + entry.getTransformers().size() + " transformer(s) from " + entry.getPath().toString() + " to " + tmpJar + ": ");
+                for (Transformer transformer : entry.getTransformers()) {
+                    Logger.debug(" - " + transformer.toString());
                 }
+                Transform.runTransformers(new SimpleTransformerContext(a -> {
+                    argsList.addAll(Arrays.asList(a));
+                    Logger.debug("Appended Launch Argument: " + Arrays.toString(a));
+                }, false, true, true), classpathProvider, entry.getPath().toString(), new RuntimeFileAccess(classRedefineCache, outputInterface, debugOut), entry.getTransformers());
             }
             
             tmpJar.toFile().deleteOnExit();
             populateAddUrl().accept(tmpJar.toUri().toURL());
             
             new PathModifyListener(entry.getPath(), path -> {
-                try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(tmpJar)) {
-                    Thread.sleep(4000);
-                    Logger.info("Detected File Modification at " + path.getFileName().toString());
-                    Map<String, byte[]> redefine = new HashMap<>();
-                    try (OpenedFileAccess inputInterface = OpenedFileAccess.ofJar(entry.getPath())) {
+                try {
+                    Files.deleteIfExists(tmpJar);
+                    Files.copy(entry.getPath(), tmpJar);
+                    try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(tmpJar)) {
+                        Thread.sleep(4000);
+                        Logger.info("Detected File Modification at " + path.getFileName().toString());
+                        Map<String, byte[]> redefine = new HashMap<>();
                         Logger.debug("Transforming " + entry.getTransformers().size() + " transformer(s) from " + entry.getPath().toString() + " to " + tmpJar + ": ");
                         for (Transformer transformer : entry.getTransformers()) {
                             Logger.debug(" - " + transformer.toString());
                         }
                         Transform.runTransformers(new SimpleTransformerContext(
                                 $ -> {}, true, false, false
-                        ), classpathProvider, entry.getPath().toString(), new AbstractFileAccess(inputInterface) {
-                            @Override
-                            public boolean addFile(String path, byte[] bytes) throws IOException {
-                                String s = stripLeadingSlash.apply(path);
-                                if (outputInterface.addFile(s, bytes) && (debugOut == null || debugOut.addFile(s, bytes))) {
-                                    if (path.endsWith(".class")) {
-                                        s = s.substring(0, s.length() - 6);
-                                        String sha256 = HashUtils.sha256(bytes);
-                                        if (!Objects.equals(classRedefineCache.get(s), sha256)) {
-                                            classRedefineCache.put(s, sha256);
-                                            redefine.put(s, bytes);
-                                        }
-                                    }
-                                    
-                                    return true;
-                                }
-                                return false;
-                            }
-                            
-                            @Override
-                            public byte[] modifyFile(String path, byte[] bytes) throws IOException {
-                                if (bytes != null) {
-                                    if (debugOut != null) {
-                                        debugOut.addFile(stripLeadingSlash.apply(path), bytes);
-                                    }
-                                    
-                                    if (path.endsWith(".class")) {
-                                        String s = stripLeadingSlash.apply(path);
-                                        s = s.substring(0, s.length() - 6);
-                                        String sha256 = HashUtils.sha256(bytes);
-                                        if (!Objects.equals(classRedefineCache.get(s), sha256)) {
-                                            classRedefineCache.put(s, sha256);
-                                            redefine.put(s, bytes);
-                                        }
-                                    }
-                                }
-                                
-                                return bytes;
-                            }
-                            
-                            @Override
-                            public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
-                                byte[] bytes = outputInterface.modifyFile(stripLeadingSlash.apply(path), action);
-                                return modifyFile(path, bytes);
-                            }
-                            
-                            @Override
-                            public boolean deleteFile(String path) throws IOException {
-                                String s = stripLeadingSlash.apply(path);
-                                if (outputInterface.deleteFile(s) && (debugOut == null || debugOut.deleteFile(s))) {
-                                    if (path.endsWith(".class")) {
-                                        s = s.substring(0, s.length() - 6);
-                                        classRedefineCache.remove(s);
-                                        redefine.remove(s);
-                                    }
-                                    
-                                    return true;
-                                }
-                                return false;
-                            }
-                            
-                            @Override
-                            public String toString() {
-                                return fileView.toString();
-                            }
-                            
-                            @Override
-                            public void close() {
-                            }
-                        }, entry.getTransformers());
-                    }
-                    if (TransformerAgent.getInstrumentation().isRedefineClassesSupported()) {
-                        redefineClasses(redefine);
+                        ), classpathProvider, entry.getPath().toString(), new RuntimeReloadFileAccess(classRedefineCache, redefine, outputInterface, debugOut), entry.getTransformers());
+                        if (TransformerAgent.getInstrumentation().isRedefineClassesSupported()) {
+                            redefineClasses(redefine);
+                        }
                     }
                 } catch (Exception exception) {
                     exception.printStackTrace();
@@ -354,89 +263,7 @@ public class TransformerRuntime {
             throw new RuntimeException(e);
         }
         Instrumentation instrumentation = TransformerAgent.getInstrumentation();
-        instrumentation.addTransformer(new ClassFileTransformer() {
-            @Override
-            public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) {
-                if (loader == ClassLoader.getSystemClassLoader()) return classfileBuffer;
-                AtomicReference<byte[]> classBytes = new AtomicReference<>(classfileBuffer);
-                Map.Entry<List<Transformer>, DirectoryFileAccess> transformers = CLASSES_TO_TRANSFORM.get(className + ".class");
-                if (transformers != null) {
-                    try {
-                        Transform.measureTime(() -> {
-                            handler.handle(className + ".class", new FileAccess() {
-                                @Override
-                                public boolean isClosed() {
-                                    return false;
-                                }
-                                
-                                @Override
-                                public void handle(Consumer<String> action) {
-                                    action.accept(className + ".class");
-                                }
-                                
-                                @Override
-                                public void handle(BiConsumer<String, byte[]> action) {
-                                    action.accept(className + ".class", classBytes.get());
-                                }
-                                
-                                @Override
-                                public boolean addFile(String path, byte[] bytes) {
-                                    if (Transform.trimSlashes(path).equals(className + ".class") && bytes != null) {
-                                        classBytes.set(bytes);
-                                        return true;
-                                    }
-                                    
-                                    return false;
-                                }
-                                
-                                @Override
-                                public byte[] modifyFile(String path, byte[] bytes) throws IOException {
-                                    if (Transform.trimSlashes(path).equals(className + ".class")) {
-                                        classBytes.set(bytes);
-                                        return bytes;
-                                    }
-                                    
-                                    return null;
-                                }
-                                
-                                @Override
-                                public byte[] modifyFile(String path, UnaryOperator<byte[]> action) {
-                                    if (Transform.trimSlashes(path).equals(className + ".class")) {
-                                        classBytes.set(action.apply(classBytes.get()));
-                                        return classBytes.get();
-                                    }
-                                    
-                                    return null;
-                                }
-                                
-                                @Override
-                                public boolean deleteFile(String path) {
-                                    return false;
-                                }
-                                
-                                @Override
-                                public String toString() {
-                                    return className + ".class";
-                                }
-                                
-                                @Override
-                                public void close() {
-                                    
-                                }
-                            }, transformers.getKey());
-                        }, duration -> {
-                            Logger.debug("Transformed " + className + " in " + formatDuration(duration));
-                        });
-                        if (transformers.getValue() != null) {
-                            transformers.getValue().addFile(className + ".class", classBytes.get());
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-                return classBytes.get();
-            }
-        }, instrumentation.isRedefineClassesSupported());
+        instrumentation.addTransformer(new ClassTransformerFileAccess(handler, CLASSES_TO_TRANSFORM::get), instrumentation.isRedefineClassesSupported());
     }
     
     private static Consumer<URL> populateAddUrl() {

@@ -59,7 +59,7 @@ public class TransformerClassWriter extends ClassWriter {
                 return get(classpath, classLoader, output, bytes);
             }
             try {
-                byte[] bytes = output.modifyFile(type + ".class", b -> b);
+                byte[] bytes = output.getFile(type + ".class");
                 if (bytes != null) {
                     return get(classpath, classLoader, output, bytes);
                 }

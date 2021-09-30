@@ -26,10 +26,8 @@ package dev.architectury.transformer.input;
 import dev.architectury.transformer.util.ClosableChecker;
 
 import java.io.IOException;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
-public abstract class AbstractFileAccess extends ClosableChecker implements FileAccess {
+public abstract class AbstractFileAccess extends ClosableChecker implements FileAccess, ForwardingFileView {
     protected FileView fileView;
     
     public AbstractFileAccess(FileView fileView) {
@@ -37,26 +35,19 @@ public abstract class AbstractFileAccess extends ClosableChecker implements File
     }
     
     @Override
-    public void handle(Consumer<String> action) throws IOException {
+    public FileView parent() throws IOException {
         validateCloseState();
-        if (fileView != null) {
-            fileView.handle(action);
-        }
-    }
-    
-    @Override
-    public void handle(BiConsumer<String, byte[]> action) throws IOException {
-        validateCloseState();
-        if (fileView != null) {
-            fileView.handle(action);
-        }
+        return fileView;
     }
     
     @Override
     public void close() throws IOException {
-        validateCloseState();
-        if (fileView != null) {
-            fileView.close();
-        }
+        ForwardingFileView.super.close();
+        closeAndValidate();
+    }
+    
+    @Override
+    public byte[] getFile(String path) throws IOException {
+        return ForwardingFileView.super.getFile(path);
     }
 }

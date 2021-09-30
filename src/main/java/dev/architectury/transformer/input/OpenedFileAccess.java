@@ -29,11 +29,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.function.UnaryOperator;
 
-public class OpenedFileAccess extends ClosableChecker implements FileAccess {
+public class OpenedFileAccess extends ClosableChecker implements ForwardingFileAccess {
     private final Provider provider;
     private final Lock lock = new ReentrantLock();
     private FileAccess fileAccess;
@@ -59,7 +56,8 @@ public class OpenedFileAccess extends ClosableChecker implements FileAccess {
         FileAccess provide() throws IOException;
     }
     
-    private FileAccess getParent() throws IOException {
+    @Override
+    public FileAccess parent() throws IOException {
         validateCloseState();
         
         try {
@@ -72,36 +70,6 @@ public class OpenedFileAccess extends ClosableChecker implements FileAccess {
         } finally {
             lock.unlock();
         }
-    }
-    
-    @Override
-    public void handle(Consumer<String> action) throws IOException {
-        getParent().handle(action);
-    }
-    
-    @Override
-    public void handle(BiConsumer<String, byte[]> action) throws IOException {
-        getParent().handle(action);
-    }
-    
-    @Override
-    public boolean addFile(String path, byte[] bytes) throws IOException {
-        return getParent().addFile(path, bytes);
-    }
-    
-    @Override
-    public byte[] modifyFile(String path, byte[] bytes) throws IOException {
-        return getParent().modifyFile(path, bytes);
-    }
-    
-    @Override
-    public byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException {
-        return getParent().modifyFile(path, action);
-    }
-    
-    @Override
-    public boolean deleteFile(String path) throws IOException {
-        return getParent().deleteFile(path);
     }
     
     @Override

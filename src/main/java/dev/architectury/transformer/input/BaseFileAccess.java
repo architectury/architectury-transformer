@@ -121,6 +121,12 @@ public abstract class BaseFileAccess extends ClosableChecker implements FileAcce
         clearCache();
     }
     
+    @Override
+    public byte[] getFile(String path) throws IOException {
+        validateCloseState();
+        return exists(path) ? cacheRead(path) : null;
+    }
+    
     protected abstract boolean exists(String path) throws IOException;
     
     protected abstract byte[] read(String path) throws IOException;

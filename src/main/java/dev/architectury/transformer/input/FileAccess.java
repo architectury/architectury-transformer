@@ -23,21 +23,52 @@
 
 package dev.architectury.transformer.input;
 
+import dev.architectury.transformer.Transform;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 public interface FileAccess extends FileView {
+    /**
+     * Adds a file, overrides the existing file if it already exists.
+     *
+     * @param path  the path to the file
+     * @param bytes the file bytes
+     * @return whether it was able to add the file
+     */
     boolean addFile(String path, byte[] bytes) throws IOException;
     
+    /**
+     * Modifies a file, overrides the existing file if it already exists.
+     *
+     * @param path  the path to the file
+     * @param bytes the new file bytes
+     * @return the modified file, or {@code null} if unable to modify
+     */
     byte[] modifyFile(String path, byte[] bytes) throws IOException;
     
+    /**
+     * Modifies a file, that is transformed from the old file.
+     * Does nothing if it does not exist.
+     *
+     * @param path   the path to the file
+     * @param action the transformer which transforms the old file
+     * @return the modified file, or {@code null} if unable to modify
+     */
     byte[] modifyFile(String path, UnaryOperator<byte[]> action) throws IOException;
     
+    /**
+     * Deletes a file, if it exists.
+     *
+     * @param path the path to the file
+     * @return whether it was able to delete the file
+     */
     boolean deleteFile(String path) throws IOException;
     
     default void modifyFiles(Predicate<String> pathPredicate, BiFunction<String, byte[], byte[]> action) throws IOException {
@@ -90,5 +121,18 @@ public interface FileAccess extends FileView {
     
     default boolean deleteClass(String path) throws IOException {
         return deleteFile(path + ".class");
+    }
+    
+    @Override
+    default byte[] getFile(String path) throws IOException {
+        AtomicReference<byte[]> bytes = new AtomicReference<>(null);
+        String trimLeadingSlash = Transform.trimLeadingSlash(path);
+        bytes.set(modifyFile(path, b -> b));
+        if (bytes.get() != null) {
+            handle(p -> Transform.trimLeadingSlash(p).equals(trimLeadingSlash), ($, b) -> {
+                bytes.set(b);
+            });
+        }
+        return bytes.get();
     }
 }

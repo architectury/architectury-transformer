@@ -28,10 +28,8 @@ import dev.architectury.transformer.util.ClosableChecker;
 import java.io.IOException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
-public class OpenedFileView extends ClosableChecker implements FileView {
+public class OpenedFileView extends ClosableChecker implements ForwardingFileView {
     private final Provider provider;
     private Lock lock = new ReentrantLock();
     private FileView fileView;
@@ -49,7 +47,8 @@ public class OpenedFileView extends ClosableChecker implements FileView {
         FileView provide() throws IOException;
     }
     
-    private FileView getParent() throws IOException {
+    @Override
+    public FileView parent() throws IOException {
         validateCloseState();
         
         try {
@@ -62,16 +61,6 @@ public class OpenedFileView extends ClosableChecker implements FileView {
         } finally {
             lock.unlock();
         }
-    }
-    
-    @Override
-    public void handle(Consumer<String> action) throws IOException {
-        getParent().handle(action);
-    }
-    
-    @Override
-    public void handle(BiConsumer<String, byte[]> action) throws IOException {
-        getParent().handle(action);
     }
     
     @Override

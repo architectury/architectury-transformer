@@ -23,11 +23,13 @@
 
 package dev.architectury.transformer.input;
 
+import dev.architectury.transformer.Transform;
 import dev.architectury.transformer.util.Logger;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -71,6 +73,15 @@ public interface FileView extends ClosedIndicator {
         }
     }
     
+    default byte[] getFile(String path) throws IOException {
+        AtomicReference<byte[]> bytes = new AtomicReference<>(null);
+        String trimLeadingSlash = Transform.trimLeadingSlash(path);
+        handle(p -> Transform.trimLeadingSlash(p).equals(trimLeadingSlash), ($, b) -> {
+            bytes.set(b);
+        });
+        return bytes.get();
+    }
+    
     default byte[] asZipFile() throws IOException {
         ByteArrayOutputStream stream = new ByteArrayOutputStream(8192);
         try (ZipOutputStream zos = new ZipOutputStream(stream)) {
@@ -87,5 +98,11 @@ public interface FileView extends ClosedIndicator {
             throw exception.getCause();
         }
         return stream.toByteArray();
+    }
+    
+    default MemoryFileAccess remember() throws IOException {
+        MemoryFileAccess access = MemoryFileAccess.of();
+        copyTo(access);
+        return access;
     }
 }
