@@ -154,8 +154,10 @@ public class TransformerRuntime {
             Path tmpJar = Files.createTempFile(null, ".jar");
             tmpJars.add(tmpJar);
             Files.deleteIfExists(tmpJar);
-            Files.copy(entry.getPath(), tmpJar);
             try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(tmpJar)) {
+                try (OpenedFileAccess og = OpenedFileAccess.ofJar(entry.getPath())) {
+                    og.copyTo(outputInterface);
+                }
                 Logger.debug("Transforming " + entry.getTransformers().size() + " transformer(s) from " + entry.getPath().toString() + " to " + tmpJar + ": ");
                 for (Transformer transformer : entry.getTransformers()) {
                     Logger.debug(" - " + transformer.toString());
@@ -171,10 +173,12 @@ public class TransformerRuntime {
             
             new PathModifyListener(entry.getPath(), path -> {
                 try {
-                    Files.deleteIfExists(tmpJar);
-                    Files.copy(entry.getPath(), tmpJar);
                     try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(tmpJar)) {
                         Thread.sleep(4000);
+                        Files.deleteIfExists(tmpJar);
+                        try (OpenedFileAccess og = OpenedFileAccess.ofJar(entry.getPath())) {
+                            og.copyTo(outputInterface);
+                        }
                         Logger.info("Detected File Modification at " + path.getFileName().toString());
                         Map<String, byte[]> redefine = new HashMap<>();
                         Logger.debug("Transforming " + entry.getTransformers().size() + " transformer(s) from " + entry.getPath().toString() + " to " + tmpJar + ": ");
@@ -185,7 +189,7 @@ public class TransformerRuntime {
                                 $ -> {}, true, false, false
                         ), classpathProvider, entry.getPath().toString(), new RuntimeReloadFileAccess(classRedefineCache, redefine, outputInterface, debugOut), entry.getTransformers());
                         if (TransformerAgent.getInstrumentation().isRedefineClassesSupported()) {
-                            redefineClasses(redefine);
+                            redefineClasses(entry.getPath().toString(), redefine);
                         }
                     }
                 } catch (Exception exception) {
@@ -219,7 +223,7 @@ public class TransformerRuntime {
                 .collect(Collectors.toList());
     }
     
-    private static void redefineClasses(Map<String, byte[]> redefine) throws Exception {
+    private static void redefineClasses(String input, Map<String, byte[]> redefine) throws Exception {
         Class<?>[] allLoadedClasses = TransformerAgent.getInstrumentation().getAllLoadedClasses();
         List<ClassDefinition> definitions = new ArrayList<>();
         redefine.forEach((s, bytes) -> {
@@ -238,7 +242,7 @@ public class TransformerRuntime {
         if (!definitions.isEmpty()) {
             Transform.logTime(() -> {
                 TransformerAgent.getInstrumentation().redefineClasses(definitions.toArray(new ClassDefinition[0]));
-            }, "Redefined " + definitions.size() + " class(es)");
+            }, "Redefined " + definitions.size() + " class(es) from " + input);
         }
     }
     

@@ -47,8 +47,8 @@ public class RuntimeReloadFileAccess extends AbstractFileAccess {
         bytes = out.modifyFile(s, bytes);
         if (s.endsWith(".class") && bytes != null) {
             String sha256 = HashUtils.sha256(bytes);
-            if (!Objects.equals(classRedefineCache.get(s), sha256)) {
-                String className = s.substring(0, s.length() - 6);
+            String className = s.substring(0, s.length() - 6);
+            if (!Objects.equals(classRedefineCache.get(className), sha256)) {
                 classRedefineCache.put(className, sha256);
                 redefine.put(className, bytes);
             }
@@ -65,8 +65,8 @@ public class RuntimeReloadFileAccess extends AbstractFileAccess {
         byte[] bytes = out.modifyFile(s, action);
         if (s.endsWith(".class") && bytes != null) {
             String sha256 = HashUtils.sha256(bytes);
-            if (!Objects.equals(classRedefineCache.get(s), sha256)) {
-                String className = s.substring(0, s.length() - 6);
+            String className = s.substring(0, s.length() - 6);
+            if (!Objects.equals(classRedefineCache.get(className), sha256)) {
                 classRedefineCache.put(className, sha256);
                 redefine.put(className, bytes);
             }
