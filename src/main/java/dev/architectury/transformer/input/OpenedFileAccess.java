@@ -25,6 +25,7 @@ package dev.architectury.transformer.input;
 
 import dev.architectury.transformer.util.ClosableChecker;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.locks.Lock;
@@ -34,9 +35,16 @@ public class OpenedFileAccess extends ClosableChecker implements ForwardingFileA
     private final Provider provider;
     private final Lock lock = new ReentrantLock();
     private FileAccess fileAccess;
+    @Nullable
+    private String name;
     
     protected OpenedFileAccess(Provider provider) {
         this.provider = provider;
+    }
+    
+    protected OpenedFileAccess(Provider provider, @Nullable String name) {
+        this(provider);
+        this.name = name;
     }
     
     public static OpenedFileAccess of(Provider provider) {
@@ -44,11 +52,11 @@ public class OpenedFileAccess extends ClosableChecker implements ForwardingFileA
     }
     
     public static OpenedFileAccess ofJar(Path path) {
-        return new OpenedFileAccess(() -> new JarFileAccess(path));
+        return new OpenedFileAccess(() -> new JarFileAccess(path), path.toString());
     }
     
     public static OpenedFileAccess ofDirectory(Path path) {
-        return new OpenedFileAccess(() -> new DirectoryFileAccess(path));
+        return new OpenedFileAccess(() -> new DirectoryFileAccess(path), path.toString());
     }
     
     @FunctionalInterface
@@ -79,5 +87,16 @@ public class OpenedFileAccess extends ClosableChecker implements ForwardingFileA
             fileAccess.close();
         }
         fileAccess = null;
+    }
+    
+    @Override
+    public String toString() {
+        if (name != null) {
+            return name;
+        } else if (fileAccess != null && !fileAccess.isClosed()) {
+            return fileAccess.toString();
+        }
+        
+        return super.toString();
     }
 }

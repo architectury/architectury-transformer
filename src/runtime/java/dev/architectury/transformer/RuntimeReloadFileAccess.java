@@ -10,29 +10,32 @@ import java.util.Objects;
 import java.util.function.UnaryOperator;
 
 public class RuntimeReloadFileAccess extends AbstractFileAccess {
-    private final Map<String, String> classRedefineCache;
+    private final Map<String, String> lastClassRedefineCache;
+    private final Map<String, String> thisClassRedefineCache;
     private final Map<String, byte[]> redefine;
     private final FileAccess out;
-    private final FileAccess debugOut;
     
-    public RuntimeReloadFileAccess(Map<String, String> classRedefineCache, Map<String, byte[]> redefine, FileAccess out, FileAccess debugOut) {
+    public RuntimeReloadFileAccess(Map<String, String> lastClassRedefineCache, Map<String, String> thisClassRedefineCache, Map<String, byte[]> redefine, FileAccess out) {
         super(out);
-        this.classRedefineCache = classRedefineCache;
+        this.lastClassRedefineCache = lastClassRedefineCache;
+        this.thisClassRedefineCache = thisClassRedefineCache;
         this.redefine = redefine;
         this.out = out;
-        this.debugOut = debugOut;
     }
     
     @Override
     public boolean addFile(String path, byte[] bytes) throws IOException {
         String s = Transform.trimSlashes(path);
-        if (out.addFile(s, bytes) && (debugOut == null || debugOut.addFile(s, bytes))) {
+        if (out.addFile(s, bytes)) {
             if (path.endsWith(".class")) {
                 s = s.substring(0, s.length() - 6);
                 String sha256 = HashUtils.sha256(bytes);
-                if (!Objects.equals(classRedefineCache.get(s), sha256)) {
-                    classRedefineCache.put(s, sha256);
+                if (!Objects.equals(lastClassRedefineCache.get(s), sha256)) {
+                    thisClassRedefineCache.put(s, sha256);
                     redefine.put(s, bytes);
+                } else if (thisClassRedefineCache.containsKey(s)) {
+                    thisClassRedefineCache.remove(s);
+                    redefine.remove(s);
                 }
             }
             
@@ -48,13 +51,13 @@ public class RuntimeReloadFileAccess extends AbstractFileAccess {
         if (s.endsWith(".class") && bytes != null) {
             String sha256 = HashUtils.sha256(bytes);
             String className = s.substring(0, s.length() - 6);
-            if (!Objects.equals(classRedefineCache.get(className), sha256)) {
-                classRedefineCache.put(className, sha256);
+            if (!Objects.equals(lastClassRedefineCache.get(className), sha256)) {
+                thisClassRedefineCache.put(className, sha256);
                 redefine.put(className, bytes);
+            } else if (thisClassRedefineCache.containsKey(className)) {
+                thisClassRedefineCache.remove(className);
+                redefine.remove(className);
             }
-        }
-        if (debugOut != null && bytes != null) {
-            return debugOut.modifyFile(s, bytes);
         }
         return bytes;
     }
@@ -66,13 +69,13 @@ public class RuntimeReloadFileAccess extends AbstractFileAccess {
         if (s.endsWith(".class") && bytes != null) {
             String sha256 = HashUtils.sha256(bytes);
             String className = s.substring(0, s.length() - 6);
-            if (!Objects.equals(classRedefineCache.get(className), sha256)) {
-                classRedefineCache.put(className, sha256);
+            if (!Objects.equals(lastClassRedefineCache.get(className), sha256)) {
+                thisClassRedefineCache.put(className, sha256);
                 redefine.put(className, bytes);
+            } else if (thisClassRedefineCache.containsKey(className)) {
+                thisClassRedefineCache.remove(className);
+                redefine.remove(className);
             }
-        }
-        if (debugOut != null && bytes != null) {
-            return debugOut.modifyFile(s, bytes);
         }
         return bytes;
     }
@@ -80,10 +83,10 @@ public class RuntimeReloadFileAccess extends AbstractFileAccess {
     @Override
     public boolean deleteFile(String path) throws IOException {
         String s = Transform.trimSlashes(path);
-        if (out.deleteFile(s) && (debugOut == null || debugOut.deleteFile(s))) {
+        if (out.deleteFile(s)) {
             if (path.endsWith(".class")) {
                 s = s.substring(0, s.length() - 6);
-                classRedefineCache.remove(s);
+                thisClassRedefineCache.remove(s);
                 redefine.remove(s);
             }
             

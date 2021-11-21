@@ -185,10 +185,17 @@ public class TransformerRuntime {
                         for (Transformer transformer : entry.getTransformers()) {
                             Logger.debug(" - " + transformer.toString());
                         }
+                        Map<String, String> thisClassRedefineCache = new HashMap<>(classRedefineCache);
                         Transform.runTransformers(new SimpleTransformerContext(
                                 $ -> {}, true, false, false
-                        ), classpathProvider, entry.getPath().toString(), new RuntimeReloadFileAccess(classRedefineCache, redefine, outputInterface, debugOut), entry.getTransformers());
+                        ), classpathProvider, entry.getPath().toString(), new RuntimeReloadFileAccess(classRedefineCache, thisClassRedefineCache, redefine, outputInterface), entry.getTransformers());
+                        classRedefineCache.putAll(thisClassRedefineCache);
                         if (TransformerAgent.getInstrumentation().isRedefineClassesSupported()) {
+                            if (debugOut != null) {
+                                for (Map.Entry<String, byte[]> redefineEntry : redefine.entrySet()) {
+                                    debugOut.modifyFile(redefineEntry.getKey() + ".class", redefineEntry.getValue());
+                                }
+                            }
                             redefineClasses(entry.getPath().toString(), redefine);
                         }
                     }

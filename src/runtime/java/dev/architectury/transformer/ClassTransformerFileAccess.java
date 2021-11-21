@@ -27,7 +27,7 @@ public class ClassTransformerFileAccess implements ClassFileTransformer {
     
     @Override
     public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) {
-        if (loader == ClassLoader.getSystemClassLoader() || classBeingRedefined != null) return classfileBuffer;
+        if (loader == ClassLoader.getSystemClassLoader()) return classfileBuffer;
         AtomicReference<byte[]> classBytes = new AtomicReference<>(classfileBuffer);
         TransformerRuntime.ToTransformData data = dataFunction.apply(className + ".class");
         if (data != null) {
