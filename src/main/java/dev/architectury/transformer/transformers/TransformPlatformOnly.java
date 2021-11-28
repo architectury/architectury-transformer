@@ -27,6 +27,7 @@ import dev.architectury.transformer.transformers.base.ClassEditTransformer;
 import dev.architectury.transformer.util.Logger;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.util.Iterator;
@@ -42,28 +43,47 @@ public class TransformPlatformOnly implements ClassEditTransformer {
             return node;
         }
         
-        Iterator<MethodNode> iter = node.methods.iterator();
-        while (iter.hasNext()) {
-            MethodNode method = iter.next();
+        Iterator<MethodNode> methodsIter = node.methods.iterator();
+        while (methodsIter.hasNext()) {
+            MethodNode method = methodsIter.next();
             AnnotationNode annotation = Optional.ofNullable(method.invisibleAnnotations)
                     .flatMap(nodes -> nodes.stream().filter(a ->
                             a.desc.equals(RemapInjectables.PLATFORM_ONLY_LEGACY) || a.desc.equals(RemapInjectables.PLATFORM_ONLY)).findAny())
                     .orElse(null);
-            
-            if (annotation == null) continue;
-            
-            for (int i = 0; i < annotation.values.size(); i += 2) {
-                String key = (String) annotation.values.get(i);
-                
-                if (key.equals("value")) {
-                    List<?> platforms = (List<?>) annotation.values.get(i + 1);
-                    if (platforms.stream().map(String::valueOf).noneMatch(platform::equals)) {
-                        iter.remove();
-                    }
-                }
+            if (shouldRemove(annotation, platform)) {
+                methodsIter.remove();
+            }
+        }
+        
+        Iterator<FieldNode> fieldsIter = node.fields.iterator();
+        while (fieldsIter.hasNext()) {
+            FieldNode field = fieldsIter.next();
+            AnnotationNode annotation = Optional.ofNullable(field.invisibleAnnotations)
+                    .flatMap(nodes -> nodes.stream().filter(a ->
+                            a.desc.equals(RemapInjectables.PLATFORM_ONLY)).findAny())
+                    .orElse(null);
+            if (shouldRemove(annotation, platform)) {
+                fieldsIter.remove();
             }
         }
         
         return node;
+    }
+    
+    private static boolean shouldRemove(AnnotationNode annotation, String platform) {
+        if (annotation == null) return false;
+        
+        for (int i = 0; i < annotation.values.size(); i += 2) {
+            String key = (String) annotation.values.get(i);
+            
+            if (key.equals("value")) {
+                List<?> platforms = (List<?>) annotation.values.get(i + 1);
+                if (platforms.stream().map(String::valueOf).noneMatch(platform::equals)) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 }
