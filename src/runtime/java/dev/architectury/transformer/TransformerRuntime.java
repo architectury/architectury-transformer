@@ -293,7 +293,7 @@ public class TransformerRuntime {
         // Java 9 and above
         return url -> {
             try {
-                TransformerAgent.getInstrumentation().appendToSystemClassLoaderSearch(new JarFile(url.getFile()));
+                TransformerAgent.getInstrumentation().appendToSystemClassLoaderSearch(new JarFile(new File(url.toURI())));
             } catch (Throwable throwable) {
                 throw new RuntimeException(throwable);
             }
