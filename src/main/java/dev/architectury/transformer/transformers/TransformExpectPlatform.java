@@ -31,14 +31,12 @@ import dev.architectury.transformer.transformers.base.AssetEditTransformer;
 import dev.architectury.transformer.transformers.base.ClassEditTransformer;
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.util.Logger;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 
-import java.util.ArrayList;
-import java.util.Objects;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static dev.architectury.transformer.transformers.RemapInjectables.getUniqueIdentifier;
 
@@ -86,6 +84,20 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
     public ClassNode doEdit(String name, ClassNode node) {
         if (!RemapInjectables.isInjectInjectables()) return node;
         for (MethodNode method : node.methods) {
+            for (ListIterator<AbstractInsnNode> iterator = method.instructions.iterator(); iterator.hasNext(); ) {
+                AbstractInsnNode instruction = iterator.next();
+                if (instruction instanceof TypeInsnNode) {
+                    TypeInsnNode typeInsn = (TypeInsnNode) instruction;
+                    if (typeInsn.getOpcode() == Opcodes.NEW) {
+                        String className = typeInsn.desc;
+                        if (getClassNode(className).visibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM) || Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM_LEGACY) || Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM_LEGACY2))) {
+                            iterator.set(new TypeInsnNode(Opcodes.NEW, getPlatformClass(className)));
+                        }
+                    }
+                }
+            }
+        }
+        for (MethodNode method : node.methods) {
             String platformMethodsClass = null;
             
             if (method.visibleAnnotations != null && method.visibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM_LEGACY))) {
@@ -123,10 +135,28 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
         
         return node;
     }
-    
-    private static String getPlatformClass(String lookupClass) {
+
+    private static ClassNode getClassNode(String name) {
+        ClassNode node = new ClassNode();
+        try {
+            ClassReader reader = new ClassReader(Objects.requireNonNull(Class.forName(name.replace('/', '.')).getResourceAsStream(name + ".class")));
+            reader.accept(node, 0);
+            return node;
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        throw new RuntimeException("Couldn't create ClassNode for class " + name);
+    }
+
+    private static String getPlatformName() {
         String platform = System.getProperty(BuiltinProperties.PLATFORM_NAME);
         Preconditions.checkNotNull(platform, BuiltinProperties.PLATFORM_NAME + " is not present!");
+        return platform;
+    }
+    
+    private static String getPlatformClass(String lookupClass) {
+        String platform = getPlatformName();
         String lookupType = lookupClass.replace("$", "") + "Impl";
         
         return lookupType.substring(0, lookupType.lastIndexOf('/')) + "/" + platform + "/" +
