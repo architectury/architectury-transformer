@@ -1,6 +1,6 @@
 /*
  * This file is licensed under the MIT License, part of architectury-transformer.
- * Copyright (c) 2020, 2021 architectury
+ * Copyright (c) 2020, 2021, 2022 architectury
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -177,7 +177,7 @@ public class SimpleTransformerHandler implements TransformHandler {
     private void applyTransforms(List<Transformer> transformers, String path, byte[] bytes, FileAccess output) throws IOException {
         ClassReader reader = new ClassReader(bytes);
         if ((reader.getAccess() & Opcodes.ACC_MODULE) == 0) {
-            ClassNode node = new ClassNode(Opcodes.ASM8);
+            ClassNode node = new ClassNode(Opcodes.ASM9);
             reader.accept(node, ClassReader.EXPAND_FRAMES);
             
             if (shouldDelete(transformers, path, node)) {

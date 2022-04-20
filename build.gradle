@@ -43,7 +43,7 @@ license {
 
     ext {
         name = "architectury"
-        year = "2020, 2021"
+        year = "2020, 2021, 2022"
     }
 
     include "**/*.java"
@@ -52,14 +52,14 @@ license {
 dependencies {
     implementation "dev.architectury:tiny-remapper:1.1.0"
     implementation "net.fabricmc:tiny-mappings-parser:0.2.2.14"
-    implementation "org.ow2.asm:asm:9.2"
-    implementation "org.ow2.asm:asm-commons:9.2"
-    implementation "org.ow2.asm:asm-tree:9.2"
-    implementation "org.ow2.asm:asm-util:9.2"
+    implementation "org.ow2.asm:asm:9.3"
+    implementation "org.ow2.asm:asm-commons:9.3"
+    implementation "org.ow2.asm:asm-tree:9.3"
+    implementation "org.ow2.asm:asm-util:9.3"
     implementation "com.google.guava:guava:29.0-jre"
     implementation "com.google.code.gson:gson:2.8.5"
     implementation "dev.architectury:refmap-remapper:1.0.5"
-    compileOnly "org.jetbrains:annotations:20.1.0"
+    compileOnly "org.jetbrains:annotations:23.0.0"
 }
 
 task sourcesJar(type: Jar, dependsOn: classes) {
