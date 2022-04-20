@@ -40,6 +40,7 @@ public class GenerateFakeQuiltMod extends AbstractFakeMod {
                 "    \"group\": \"architectury." + fakeModId + "\",\n" +
                 "    \"id\": \"" + fakeModId + "\",\n" +
                 "    \"version\": \"1.0.0\",\n" +
+                "    \"intermediate_mappings\": \"net.fabricmc:intermediary\",\n" +
                 "    \"metadata\": {\n" +
                 "      \"name\": \"Generated Mod (Please Ignore)\"\n" +
                 "    }\n" +
