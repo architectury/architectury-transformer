@@ -35,7 +35,7 @@ public class GenerateFakeQuiltMod extends AbstractFakeMod {
         String fakeModId = generateModId();
         output.addFile("quilt.mod.json",
                 "{\n" +
-                "  \"schemaVersion\": 1,\n" +
+                "  \"schema_version\": 1,\n" +
                 "  \"quilt_loader\": {\n" +
                 "    \"group\": \"architectury." + fakeModId + "\",\n" +
                 "    \"id\": \"" + fakeModId + "\",\n" +
