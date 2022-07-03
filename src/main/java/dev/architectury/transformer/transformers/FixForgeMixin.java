@@ -69,7 +69,7 @@ public class FixForgeMixin implements AssetEditTransformer {
                         boolean hasClient = json.has("client") && json.get("client").isJsonArray();
                         boolean hasServer = json.has("server") && json.get("server").isJsonArray();
                         if (json.has("package") && (hasMixins || hasClient || hasServer)) {
-                            mixinConfigs.add(path);
+                            mixinConfigs.add(trimmedPath);
                         }
                     }
                 } catch (Exception ignored) {
