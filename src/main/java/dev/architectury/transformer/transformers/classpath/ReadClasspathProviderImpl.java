@@ -23,14 +23,12 @@
 
 package dev.architectury.transformer.transformers.classpath;
 
-import dev.architectury.tinyremapper.FileSystemHandler;
 import dev.architectury.transformer.Transform;
+import dev.architectury.transformer.input.OpenedFileAccess;
 import dev.architectury.transformer.transformers.ClasspathProvider;
 
+import java.io.Closeable;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -38,6 +36,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class ReadClasspathProviderImpl implements ReadClasspathProvider {
@@ -58,10 +59,10 @@ public class ReadClasspathProviderImpl implements ReadClasspathProvider {
                     Transform.logTime(() -> {
                         ExecutorService threadPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
                         List<CompletableFuture<List<Map.Entry<String, byte[]>>>> futures = new ArrayList<>();
-                        List<FileSystem> fsToClose = Collections.synchronizedList(new ArrayList<>());
+                        List<Closeable> fsToClose = Collections.synchronizedList(new ArrayList<>());
                         
                         for (Path path : provider.provide()) {
-                            futures.add(read(path, threadPool, fsToClose, true));
+                            futures.add(read(new FilePathEntry(path), threadPool, fsToClose, true));
                         }
                         
                         CompletableFuture<List<Map.Entry<String, byte[]>>> future = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
@@ -78,8 +79,8 @@ public class ReadClasspathProviderImpl implements ReadClasspathProvider {
                         }).map(Map.Entry::getValue).toArray(byte[][]::new);
                         threadPool.awaitTermination(0, TimeUnit.SECONDS);
                         
-                        for (FileSystem system : fsToClose) {
-                            FileSystemHandler.close(system);
+                        for (Closeable system : fsToClose) {
+                            system.close();
                         }
                     }, "Read classpath");
                 } catch (Exception e) {
@@ -97,11 +98,11 @@ public class ReadClasspathProviderImpl implements ReadClasspathProvider {
         return map.getOrDefault(type, -1);
     }
     
-    private CompletableFuture<List<Map.Entry<String, byte[]>>> read(Path path, ExecutorService service, List<FileSystem> fsToClose, boolean isParentLevel) {
+    private CompletableFuture<List<Map.Entry<String, byte[]>>> read(PathEntry path, ExecutorService service, List<Closeable> fsToClose, boolean isParentLevel) {
         if (path.toString().endsWith(".class")) {
             return CompletableFuture.supplyAsync(() -> {
                 try {
-                    byte[] bytes = Files.readAllBytes(path);
+                    byte[] bytes = path.read();
                     String s = path.toString();
                     return Collections.singletonList(new AbstractMap.SimpleImmutableEntry<>(s.substring(0, s.length() - 6), bytes));
                 } catch (IOException exception) {
@@ -109,25 +110,88 @@ public class ReadClasspathProviderImpl implements ReadClasspathProvider {
                 }
                 return Collections.emptyList();
             }, service);
-        } else if (isParentLevel && (path.toString().endsWith(".zip") || path.toString().endsWith(".jar"))) {
+        } else if (path.isArchive()) {
             try {
-                URI uri = new URI("jar:" + path.toUri());
-                FileSystem fs = FileSystemHandler.open(uri);
-                fsToClose.add(fs);
                 List<CompletableFuture<List<Map.Entry<String, byte[]>>>> futures = new ArrayList<>();
-                Files.walk(fs.getPath("/")).forEach(f -> {
+                Closeable closeable = path.walkArchive(f -> {
                     futures.add(read(f, service, fsToClose, false));
                 });
+                fsToClose.add(closeable);
                 return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).thenApply(unused -> futures.stream()
                         .map(CompletableFuture::join)
                         .flatMap(Collection::stream)
                         .collect(Collectors.toList()));
-            } catch (URISyntaxException e) {
-                throw new RuntimeException(e);
             } catch (IOException exception) {
                 exception.printStackTrace();
             }
         }
         return CompletableFuture.completedFuture(Collections.emptyList());
+    }
+    
+    private interface PathEntry {
+        byte[] read() throws IOException;
+        
+        boolean isArchive();
+        
+        Closeable walkArchive(Consumer<PathEntry> callback) throws IOException;
+    }
+    
+    private static class FilePathEntry implements PathEntry {
+        private final Path path;
+        
+        public FilePathEntry(Path path) {
+            this.path = path;
+        }
+        
+        @Override
+        public String toString() {
+            return this.path.toString();
+        }
+        
+        @Override
+        public byte[] read() throws IOException {
+            return Files.readAllBytes(path);
+        }
+        
+        @Override
+        public boolean isArchive() {
+            return toString().endsWith(".zip") || toString().endsWith(".jar");
+        }
+        
+        @Override
+        public Closeable walkArchive(Consumer<PathEntry> callback) throws IOException {
+            if (!isArchive()) throw new IllegalStateException();
+            OpenedFileAccess access = OpenedFileAccess.ofJar(path);
+            Lock lock = new ReentrantLock();
+            access.handle((name) -> {
+                callback.accept(new PathEntry() {
+                    @Override
+                    public String toString() {
+                        return Transform.trimSlashes(name);
+                    }
+                    
+                    @Override
+                    public byte[] read() throws IOException {
+                        lock.lock();
+                        try {
+                            return access.getFile(toString());
+                        } finally {
+                            lock.unlock();
+                        }
+                    }
+                    
+                    @Override
+                    public boolean isArchive() {
+                        return false;
+                    }
+                    
+                    @Override
+                    public Closeable walkArchive(Consumer<PathEntry> callback) throws IOException {
+                        throw new UnsupportedOperationException();
+                    }
+                });
+            });
+            return access;
+        }
     }
 }

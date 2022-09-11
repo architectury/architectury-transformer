@@ -31,7 +31,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class OpenedFileView extends ClosableChecker implements ForwardingFileView {
     private final Provider provider;
-    private Lock lock = new ReentrantLock();
+    private final Lock lock = new ReentrantLock();
     private FileView fileView;
     
     protected OpenedFileView(Provider provider) {
