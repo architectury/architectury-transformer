@@ -23,43 +23,28 @@
 
 package dev.architectury.transformer.input;
 
+import dev.architectury.transformer.util.FileSystemReference;
 import dev.architectury.transformer.util.Logger;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.*;
-import java.util.HashMap;
+import java.nio.file.FileSystem;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.WeakHashMap;
 
 public class JarFileAccess extends NIOFileAccess {
     private static final WeakHashMap<Path, JarFileAccess> INTERFACES = new WeakHashMap<>();
     protected final Path path;
-    private boolean shouldCloseFs;
-    private FileSystem fs;
+    private FileSystemReference fs;
     
     protected JarFileAccess(Path path) {
         super(true);
         this.path = path;
-        Map<String, String> env = new HashMap<>();
-        env.put("create", String.valueOf(Files.notExists(path)));
         
         try {
-            URI uri = new URI("jar:" + path.toUri());
-            FileSystem fs;
-            boolean shouldCloseFs = false;
-            
-            try {
-                fs = FileSystems.getFileSystem(uri);
-            } catch (FileSystemNotFoundException exception) {
-                fs = FileSystems.newFileSystem(uri, env);
-                shouldCloseFs = true;
-            }
-            
-            this.fs = fs;
-            this.shouldCloseFs = shouldCloseFs;
-        } catch (IOException | URISyntaxException exception) {
+            this.fs = FileSystemReference.openJar(path, true);
+        } catch (IOException exception) {
             throw new RuntimeException(exception);
         }
     }
@@ -90,32 +75,25 @@ public class JarFileAccess extends NIOFileAccess {
     @Override
     public void close() throws IOException {
         super.close();
-        if (shouldCloseFs) {
-            Logger.debug("Closing File Systems for " + path);
-            fs.close();
+        if (fs.closeIfPossible()) {
+            Logger.debug("Closed File Systems for " + path);
         }
         INTERFACES.remove(path, this);
     }
     
     protected FileSystem getFS() {
         validateCloseState();
-        if (!shouldCloseFs && !fs.isOpen()) {
+        if (fs.isClosed() || !fs.fs().isOpen()) {
             try {
-                Map<String, String> env = new HashMap<>();
-                env.put("create", String.valueOf(Files.notExists(path)));
-                URI uri = new URI("jar:" + path.toUri());
                 clearCache();
-                fs = FileSystems.newFileSystem(uri, env);
-                shouldCloseFs = true;
-                return fs;
+                fs = FileSystemReference.openJar(path, true);
+                return fs.fs();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }
-        if (!fs.isOpen()) {
-            throw new ClosedFileSystemException();
-        }
-        return fs;
+        
+        return fs.fs();
     }
     
     @Override
