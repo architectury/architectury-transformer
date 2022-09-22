@@ -185,7 +185,22 @@ public class SimpleTransformerHandler implements TransformHandler {
                 return;
             }
             
-            output.modifyFile(path, toByteArray(output, editNode(transformers, path, node)));
+            class _ {
+                boolean computeMaxs = false, computeFrames = false;
+            }
+            _ _ = new _();
+            ClassEditTransformer.Options options = new ClassEditTransformer.Options() {
+                @Override
+                public void computeMaxs() {
+                    _.computeMaxs = true;
+                }
+                
+                @Override
+                public void computeFrames() {
+                    _.computeFrames = true;
+                }
+            };
+            output.modifyFile(path, toByteArray(output, editNode(transformers, path, node, options), _.computeMaxs, _.computeFrames));
         }
     }
     
@@ -200,18 +215,18 @@ public class SimpleTransformerHandler implements TransformHandler {
         return false;
     }
     
-    private ClassNode editNode(List<Transformer> transformers, String path, ClassNode node) {
+    private ClassNode editNode(List<Transformer> transformers, String path, ClassNode node, ClassEditTransformer.Options options) {
         for (Transformer transformer : transformers) {
             if (transformer instanceof ClassEditTransformer) {
-                node = Objects.requireNonNull(((ClassEditTransformer) transformer).doEdit(path, node));
+                node = Objects.requireNonNull(((ClassEditTransformer) transformer).doEdit(path, node, options));
             }
         }
         
         return node;
     }
     
-    private byte[] toByteArray(FileAccess output, ClassNode node) {
-        final ClassWriter writer = new TransformerClassWriter(classpath, output, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+    private byte[] toByteArray(FileAccess output, ClassNode node, boolean computeMaxs, boolean computeFrames) {
+        final ClassWriter writer = new TransformerClassWriter(classpath, output, (computeMaxs ? ClassWriter.COMPUTE_MAXS : 0) | (computeFrames ? ClassWriter.COMPUTE_FRAMES : 0));
         node.accept(writer);
         return writer.toByteArray();
     }

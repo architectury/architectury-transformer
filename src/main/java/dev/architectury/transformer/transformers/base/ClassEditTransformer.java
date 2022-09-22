@@ -28,4 +28,16 @@ import org.objectweb.asm.tree.ClassNode;
 
 public interface ClassEditTransformer extends Transformer {
     ClassNode doEdit(String name, ClassNode node);
+    
+    default ClassNode doEdit(String name, ClassNode node, Options options) {
+        options.computeMaxs();
+        options.computeFrames();
+        return doEdit(name, node);
+    }
+    
+    interface Options {
+        void computeMaxs();
+        
+        void computeFrames();
+    }
 }
