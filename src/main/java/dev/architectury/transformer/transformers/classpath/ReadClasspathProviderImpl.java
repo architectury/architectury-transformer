@@ -24,7 +24,7 @@
 package dev.architectury.transformer.transformers.classpath;
 
 import dev.architectury.transformer.Transform;
-import dev.architectury.transformer.input.OpenedFileAccess;
+import dev.architectury.transformer.input.MemoryFileAccess;
 import dev.architectury.transformer.transformers.ClasspathProvider;
 
 import java.io.Closeable;
@@ -161,7 +161,7 @@ public class ReadClasspathProviderImpl implements ReadClasspathProvider {
         @Override
         public Closeable walkArchive(Consumer<PathEntry> callback) throws IOException {
             if (!isArchive()) throw new IllegalStateException();
-            OpenedFileAccess access = OpenedFileAccess.ofJar(path);
+            MemoryFileAccess access = MemoryFileAccess.ofZipFile(Files.readAllBytes(path));
             Lock lock = new ReentrantLock();
             access.handle((name) -> {
                 callback.accept(new PathEntry() {
