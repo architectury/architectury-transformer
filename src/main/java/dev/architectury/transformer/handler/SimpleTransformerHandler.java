@@ -226,7 +226,7 @@ public class SimpleTransformerHandler implements TransformHandler {
     }
     
     private byte[] toByteArray(FileAccess output, ClassNode node, boolean computeMaxs, boolean computeFrames) {
-        System.out.println("Writing " + node.name + " with maxs=" + computeMaxs + " frames=" + computeFrames);
+        Logger.debug("Writing " + node.name + " with maxs=" + computeMaxs + " frames=" + computeFrames);
         final ClassWriter writer = new TransformerClassWriter(classpath, output, (computeMaxs ? ClassWriter.COMPUTE_MAXS : 0) | (computeFrames ? ClassWriter.COMPUTE_FRAMES : 0));
         node.accept(writer);
         return writer.toByteArray();
