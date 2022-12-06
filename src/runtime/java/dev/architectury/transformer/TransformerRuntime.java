@@ -95,11 +95,12 @@ public class TransformerRuntime {
             return debugOut;
         }
     }
-    
+
     public static void main(String[] args) throws Throwable {
-        Logger.info("Architectury Runtime " + TransformerRuntime.class.getPackage().getImplementationVersion());
-        List<String> argsList = new ArrayList<>(Arrays.asList(args));
         applyProperties();
+        Logger logger = Logger.getDefaultLogger();
+        logger.info("Architectury Runtime " + TransformerRuntime.class.getPackage().getImplementationVersion());
+        List<String> argsList = new ArrayList<>(Arrays.asList(args));
         
         // We start our journey of achieving hell
         Path configPath = Paths.get(System.getProperty(RUNTIME_TRANSFORM_CONFIG));
@@ -128,7 +129,7 @@ public class TransformerRuntime {
                     });
                 }
             } else {
-                try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(entry.getPath())) {
+                try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(logger, entry.getPath())) {
                     MemoryFileAccess remember = outputInterface.remember();
                     outputInterface.handle(path -> {
                         String key = Transform.trimSlashes(path);
@@ -138,7 +139,7 @@ public class TransformerRuntime {
             }
         }
         List<Path> tmpJars = new ArrayList<>();
-        classpathProvider = ReadClasspathProvider.of(ClasspathProvider.fromProperties().filter(path -> {
+        classpathProvider = ReadClasspathProvider.of(logger, ClasspathProvider.fromProperties(System.getProperty(BuiltinProperties.COMPILE_CLASSPATH, "true")).filter(path -> {
             File file = path.toFile().getAbsoluteFile();
             for (PathWithTransformersEntry path1 : toTransform) {
                 if (Objects.equals(path1.toFile().getAbsoluteFile(), file)) {
@@ -154,17 +155,17 @@ public class TransformerRuntime {
             Path tmpJar = Files.createTempFile(null, ".jar");
             tmpJars.add(tmpJar);
             Files.deleteIfExists(tmpJar);
-            try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(tmpJar)) {
-                try (OpenedFileAccess og = OpenedFileAccess.ofJar(entry.getPath())) {
+            try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(logger,tmpJar)) {
+                try (OpenedFileAccess og = OpenedFileAccess.ofJar(logger, entry.getPath())) {
                     og.copyTo(outputInterface);
                 }
-                Logger.debug("Transforming " + entry.getTransformers().size() + " transformer(s) from " + entry.getPath().toString() + " to " + tmpJar + ": ");
+                logger.debug("Transforming " + entry.getTransformers().size() + " transformer(s) from " + entry.getPath().toString() + " to " + tmpJar + ": ");
                 for (Transformer transformer : entry.getTransformers()) {
-                    Logger.debug(" - " + transformer.toString());
+                    logger.debug(" - " + transformer.toString());
                 }
                 Transform.runTransformers(new SimpleTransformerContext(a -> {
                     argsList.addAll(Arrays.asList(a));
-                    Logger.debug("Appended Launch Argument: " + Arrays.toString(a));
+                    logger.debug("Appended Launch Argument: " + Arrays.toString(a));
                 }, false, true, true), classpathProvider, entry.getPath().toString(), new RuntimeFileAccess(classRedefineCache, outputInterface, debugOut), entry.getTransformers());
             }
             
@@ -173,17 +174,17 @@ public class TransformerRuntime {
             
             new PathModifyListener(entry.getPath(), path -> {
                 try {
-                    try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(tmpJar)) {
+                    try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(logger,tmpJar)) {
                         Thread.sleep(4000);
                         Files.deleteIfExists(tmpJar);
-                        try (OpenedFileAccess og = OpenedFileAccess.ofJar(entry.getPath())) {
+                        try (OpenedFileAccess og = OpenedFileAccess.ofJar(logger, entry.getPath())) {
                             og.copyTo(outputInterface);
                         }
-                        Logger.info("Detected File Modification at " + path.getFileName().toString());
+                        logger.info("Detected File Modification at " + path.getFileName().toString());
                         Map<String, byte[]> redefine = new HashMap<>();
-                        Logger.debug("Transforming " + entry.getTransformers().size() + " transformer(s) from " + entry.getPath().toString() + " to " + tmpJar + ": ");
+                        logger.debug("Transforming " + entry.getTransformers().size() + " transformer(s) from " + entry.getPath().toString() + " to " + tmpJar + ": ");
                         for (Transformer transformer : entry.getTransformers()) {
-                            Logger.debug(" - " + transformer.toString());
+                            logger.debug(" - " + transformer.toString());
                         }
                         Map<String, String> thisClassRedefineCache = new HashMap<>(classRedefineCache);
                         Transform.runTransformers(new SimpleTransformerContext(
@@ -196,7 +197,7 @@ public class TransformerRuntime {
                                     debugOut.modifyFile(redefineEntry.getKey() + ".class", redefineEntry.getValue());
                                 }
                             }
-                            redefineClasses(entry.getPath().toString(), redefine);
+                            redefineClasses(logger, entry.getPath().toString(), redefine);
                         }
                     }
                 } catch (Exception exception) {
@@ -230,7 +231,7 @@ public class TransformerRuntime {
                 .collect(Collectors.toList());
     }
     
-    private static void redefineClasses(String input, Map<String, byte[]> redefine) throws Exception {
+    private static void redefineClasses(Logger logger, String input, Map<String, byte[]> redefine) throws Exception {
         Class<?>[] allLoadedClasses = TransformerAgent.getInstrumentation().getAllLoadedClasses();
         List<ClassDefinition> definitions = new ArrayList<>();
         redefine.forEach((s, bytes) -> {
@@ -242,12 +243,12 @@ public class TransformerRuntime {
             while (iterator.hasNext()) {
                 Class<?> a = iterator.next();
                 if (a.getClassLoader() == ClassLoader.getSystemClassLoader()) continue;
-                Logger.debug("Redefining " + name);
+                logger.debug("Redefining " + name);
                 definitions.add(new ClassDefinition(a, bytes));
             }
         });
         if (!definitions.isEmpty()) {
-            Transform.logTime(() -> {
+            Transform.logTime(logger, () -> {
                 TransformerAgent.getInstrumentation().redefineClasses(definitions.toArray(new ClassDefinition[0]));
             }, "Redefined " + definitions.size() + " class(es) from " + input);
         }

@@ -24,6 +24,7 @@
 package dev.architectury.transformer.transformers;
 
 import dev.architectury.transformer.transformers.base.ClassEditTransformer;
+import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.util.Logger;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -36,10 +37,10 @@ import java.util.Optional;
 
 public class TransformPlatformOnly implements ClassEditTransformer {
     @Override
-    public ClassNode doEdit(String name, ClassNode node) {
-        String platform = System.getProperty(BuiltinProperties.PLATFORM_NAME);
+    public ClassNode doEdit(TransformerContext context, String name, ClassNode node) {
+        String platform = context.getProperty(BuiltinProperties.PLATFORM_NAME);
         if (platform == null) {
-            Logger.debug("Skipping TransformPlatformOnly because BuiltinProperties.PLATFORM_NAME is not present");
+            context.getLogger().debug("Skipping TransformPlatformOnly because BuiltinProperties.PLATFORM_NAME is not present");
             return node;
         }
         

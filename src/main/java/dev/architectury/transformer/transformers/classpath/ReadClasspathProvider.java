@@ -24,10 +24,11 @@
 package dev.architectury.transformer.transformers.classpath;
 
 import dev.architectury.transformer.transformers.ClasspathProvider;
+import dev.architectury.transformer.util.Logger;
 
 public interface ReadClasspathProvider {
-    static ReadClasspathProvider of(ClasspathProvider provider) {
-        return new ReadClasspathProviderImpl(provider.logging());
+    static ReadClasspathProvider of(Logger logger, ClasspathProvider provider) {
+        return new ReadClasspathProviderImpl(logger, provider.logging(logger));
     }
     
     byte[][] provide();

@@ -24,6 +24,7 @@
 package dev.architectury.transformer.input;
 
 import dev.architectury.transformer.util.ClosableChecker;
+import dev.architectury.transformer.util.Logger;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -51,8 +52,8 @@ public class OpenedFileAccess extends ClosableChecker implements ForwardingFileA
         return new OpenedFileAccess(provider);
     }
     
-    public static OpenedFileAccess ofJar(Path path) {
-        return new OpenedFileAccess(() -> new JarFileAccess(path), path.toString());
+    public static OpenedFileAccess ofJar(Logger logger, Path path) {
+        return new OpenedFileAccess(() -> new JarFileAccess(logger, path), path.toString());
     }
     
     public static OpenedFileAccess ofDirectory(Path path) {

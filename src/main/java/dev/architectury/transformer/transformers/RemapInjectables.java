@@ -27,6 +27,7 @@ import com.google.common.base.MoreObjects;
 import com.google.gson.JsonObject;
 import dev.architectury.tinyremapper.IMappingProvider;
 import dev.architectury.transformer.transformers.base.TinyRemapperTransformer;
+import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 
 import java.io.File;
 import java.util.Collections;
@@ -51,27 +52,27 @@ public class RemapInjectables implements TinyRemapperTransformer {
     }
     
     @Override
-    public List<IMappingProvider> collectMappings() throws Exception {
-        if (isInjectInjectables()) {
+    public List<IMappingProvider> collectMappings(TransformerContext context) {
+        if (isInjectInjectables(context)) {
             return Collections.singletonList(sink -> {
                 sink.acceptClass(
                         "dev/architectury/injectables/targets/ArchitecturyTarget",
-                        MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods"
+                        MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier(context)) + "/PlatformMethods"
                 );
             });
         }
         return Collections.emptyList();
     }
     
-    public static String getUniqueIdentifier() {
-        return System.getProperty(BuiltinProperties.UNIQUE_IDENTIFIER);
+    public static String getUniqueIdentifier(TransformerContext context) {
+        return context.getProperty(BuiltinProperties.UNIQUE_IDENTIFIER);
     }
     
-    public static boolean isInjectInjectables() {
-        return System.getProperty(BuiltinProperties.INJECT_INJECTABLES, "true").equals("true");
+    public static boolean isInjectInjectables(TransformerContext context) {
+        return context.getProperty(BuiltinProperties.INJECT_INJECTABLES, "true").equals("true");
     }
     
-    public static String[] getClasspath() {
-        return System.getProperty(BuiltinProperties.COMPILE_CLASSPATH, "true").split(File.pathSeparator);
+    public static String[] getClasspath(TransformerContext context) {
+        return context.getProperty(BuiltinProperties.COMPILE_CLASSPATH, "true").split(File.pathSeparator);
     }
 }

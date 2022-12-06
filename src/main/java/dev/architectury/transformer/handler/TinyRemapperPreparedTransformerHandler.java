@@ -37,16 +37,16 @@ public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHan
     
     public TinyRemapperPreparedTransformerHandler(ReadClasspathProvider classpath, TransformerContext context, boolean nested) throws Exception {
         super(classpath, context, nested);
-        prepare();
+        prepare(context);
     }
     
-    private void prepare() throws Exception {
-        Logger.debug("Preparing tiny remapper prepared transformer: " + getClass().getName());
+    private void prepare(TransformerContext context) throws Exception {
+        context.getLogger().debug("Preparing tiny remapper prepared transformer: " + getClass().getName());
         remapper = TinyRemapper.newRemapper()
                 .skipConflictsChecking(true)
                 .cacheMappings(true)
                 .skipPropagate(true)
-                .logger(Logger::info)
+                .logger((str) -> context.getLogger().info(str))
                 .logUnknownInvokeDynamic(false)
                 .threads(Runtime.getRuntime().availableProcessors())
                 .build();
@@ -56,16 +56,16 @@ public class TinyRemapperPreparedTransformerHandler extends SimpleTransformerHan
     }
     
     @Override
-    public TinyRemapper getRemapper(Set<IMappingProvider> providers) throws Exception {
+    public TinyRemapper getRemapper(Set<IMappingProvider> providers) {
         remapper.replaceMappings(providers);
         if (remapper.isMappingsDirty()) {
-            Logger.debug("Remapping with Dirty Mappings...");
+            context.getLogger().debug("Remapping with Dirty Mappings...");
         }
         return remapper;
     }
     
     @Override
-    protected void closeRemapper(TinyRemapper remapper) throws Exception {
+    protected void closeRemapper(TinyRemapper remapper) {
         remapper.removeInput();
     }
     

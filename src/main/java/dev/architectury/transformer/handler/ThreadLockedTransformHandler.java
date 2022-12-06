@@ -25,6 +25,7 @@ package dev.architectury.transformer.handler;
 
 import dev.architectury.transformer.Transformer;
 import dev.architectury.transformer.input.FileAccess;
+import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 
 import java.io.IOException;
 import java.util.List;
@@ -61,5 +62,10 @@ public class ThreadLockedTransformHandler implements TransformHandler {
         } finally {
             lock.unlock();
         }
+    }
+
+    @Override
+    public TransformerContext getContext() {
+        return parent.getContext();
     }
 }

@@ -25,9 +25,10 @@ package dev.architectury.transformer.transformers.base;
 
 import dev.architectury.tinyremapper.IMappingProvider;
 import dev.architectury.transformer.Transformer;
+import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 
 import java.util.List;
 
 public interface TinyRemapperTransformer extends Transformer {
-    List<IMappingProvider> collectMappings() throws Exception;
+    List<IMappingProvider> collectMappings(TransformerContext context) throws Exception;
 }

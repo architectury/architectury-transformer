@@ -26,6 +26,7 @@ package dev.architectury.transformer.transformers;
 import dev.architectury.tinyremapper.IMappingProvider;
 import dev.architectury.tinyremapper.TinyUtils;
 import dev.architectury.transformer.transformers.base.TinyRemapperTransformer;
+import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.util.Logger;
 import net.fabricmc.mapping.tree.TinyMappingFactory;
 import net.fabricmc.mapping.tree.TinyTree;
@@ -44,8 +45,8 @@ public class TransformForgeEnvironment implements TinyRemapperTransformer {
     private Map<String, IMappingProvider> mixinMappingCache = new HashMap<>();
     
     @Override
-    public List<IMappingProvider> collectMappings() throws Exception {
-        List<IMappingProvider> providers = mapMixin();
+    public List<IMappingProvider> collectMappings(TransformerContext context) throws Exception {
+        List<IMappingProvider> providers = mapMixin(context);
         providers.add(remapEnvironment());
         return providers;
     }
@@ -64,20 +65,20 @@ public class TransformForgeEnvironment implements TinyRemapperTransformer {
         };
     }
     
-    private List<IMappingProvider> mapMixin() throws IOException {
+    private List<IMappingProvider> mapMixin(TransformerContext context) throws IOException {
         List<IMappingProvider> providers = new ArrayList<>();
         
         if (srg == null) {
-            Path srgMappingsPath = Paths.get(System.getProperty(BuiltinProperties.MAPPINGS_WITH_SRG));
+            Path srgMappingsPath = Paths.get(context.getProperty(BuiltinProperties.MAPPINGS_WITH_SRG));
             try (BufferedReader reader = Files.newBufferedReader(srgMappingsPath)) {
                 srg = TinyMappingFactory.loadWithDetection(reader);
             }
         }
         
-        for (String path : System.getProperty(BuiltinProperties.MIXIN_MAPPINGS).split(File.pathSeparator)) {
+        for (String path : context.getProperty(BuiltinProperties.MIXIN_MAPPINGS).split(File.pathSeparator)) {
             File mixinMapFile = Paths.get(path).toFile();
             if (mixinMapFile.exists()) {
-                Logger.debug("Reading mixin mappings file: " + mixinMapFile.getAbsolutePath());
+                context.getLogger().debug("Reading mixin mappings file: " + mixinMapFile.getAbsolutePath());
                 providers.add(mixinMappingCache.computeIfAbsent(path, p -> sink -> {
                     TinyUtils.createTinyMappingProvider(mixinMapFile.toPath(), "named", "intermediary").load(new IMappingProvider.MappingAcceptor() {
                         @Override
@@ -89,7 +90,7 @@ public class TransformForgeEnvironment implements TinyRemapperTransformer {
                                     .map(it -> it.getName("srg"))
                                     .orElse(dstName);
                             sink.acceptClass(srcName, srgName);
-                            Logger.debug("Remap mixin class %s -> %s", srcName, srgName);
+                            context.getLogger().debug("Remap mixin class %s -> %s", srcName, srgName);
                         }
                         
                         @Override
@@ -102,7 +103,7 @@ public class TransformForgeEnvironment implements TinyRemapperTransformer {
                                     .map(it -> it.getName("srg"))
                                     .orElse(dstName);
                             sink.acceptMethod(method, srgName);
-                            Logger.debug("Remap mixin method %s#%s%s -> %s", method.owner, method.name, method.desc, srgName);
+                            context.getLogger().debug("Remap mixin method %s#%s%s -> %s", method.owner, method.name, method.desc, srgName);
                         }
                         
                         @Override
@@ -115,7 +116,7 @@ public class TransformForgeEnvironment implements TinyRemapperTransformer {
                                     .map(it -> it.getName("srg"))
                                     .orElse(dstName);
                             sink.acceptField(field, srgName);
-                            Logger.debug("Remap mixin field %s#%s:%s -> %s", field.owner, field.name, field.desc, srgName);
+                            context.getLogger().debug("Remap mixin field %s#%s:%s -> %s", field.owner, field.name, field.desc, srgName);
                         }
                         
                         @Override

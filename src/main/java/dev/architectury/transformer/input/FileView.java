@@ -61,7 +61,7 @@ public interface FileView extends ClosedIndicator {
                 try {
                     if (pathPredicate.test(path)) {
                         if (!output.addFile(path, bytes)) {
-                            Logger.debug("Failed to copy %s from %s to %s", path, this, output);
+                            Logger.getDefaultLogger().debug("Failed to copy %s from %s to %s", path, this, output);
                         }
                     }
                 } catch (IOException exception) {

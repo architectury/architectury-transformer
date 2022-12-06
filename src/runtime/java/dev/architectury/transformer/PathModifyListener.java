@@ -44,7 +44,7 @@ public class PathModifyListener extends Thread {
     @Override
     public void run() {
         try {
-            Logger.info("Listening at " + path);
+            Logger.getDefaultLogger().info("Listening at " + path);
             WatchService watcher = path.getFileSystem().newWatchService();
             try (WatchService watchService = FileSystems.getDefault().newWatchService()) {
                 WatchKey watchKey = path.getParent().register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);

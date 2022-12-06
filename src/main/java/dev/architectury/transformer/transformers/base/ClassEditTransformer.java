@@ -24,15 +24,16 @@
 package dev.architectury.transformer.transformers.base;
 
 import dev.architectury.transformer.Transformer;
+import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import org.objectweb.asm.tree.ClassNode;
 
 public interface ClassEditTransformer extends Transformer {
-    ClassNode doEdit(String name, ClassNode node);
+    ClassNode doEdit(TransformerContext context, String name, ClassNode node);
     
-    default ClassNode doEdit(String name, ClassNode node, Options options) {
+    default ClassNode doEdit(TransformerContext context, String name, ClassNode node, Options options) {
         options.computeMaxs();
         options.computeFrames();
-        return doEdit(name, node);
+        return doEdit(context, name, node);
     }
     
     interface Options {

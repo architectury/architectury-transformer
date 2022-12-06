@@ -25,11 +25,14 @@ package dev.architectury.transformer.handler;
 
 import dev.architectury.transformer.Transformer;
 import dev.architectury.transformer.input.FileAccess;
+import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 
 import java.io.Closeable;
 import java.util.List;
 
 public interface TransformHandler extends Closeable {
+    TransformerContext getContext();
+
     default TransformHandler asThreadLocked() {
         return new ThreadLockedTransformHandler(this);
     }
