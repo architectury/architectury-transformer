@@ -175,7 +175,9 @@ public class TransformerRuntime {
                 try {
                     try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(tmpJar)) {
                         Thread.sleep(4000);
-                        Files.deleteIfExists(tmpJar);
+                        if (!System.getProperty("os.name").startsWith("Windows")) {
+                            Files.deleteIfExists(tmpJar);
+                        }
                         try (OpenedFileAccess og = OpenedFileAccess.ofJar(entry.getPath())) {
                             og.copyTo(outputInterface);
                         }
