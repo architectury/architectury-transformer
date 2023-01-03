@@ -35,11 +35,13 @@ import java.util.WeakHashMap;
 
 public class JarFileAccess extends NIOFileAccess {
     private static final WeakHashMap<Path, JarFileAccess> INTERFACES = new WeakHashMap<>();
+    private final Logger logger;
     protected final Path path;
     private FileSystemReference fs;
     
-    protected JarFileAccess(Path path) {
+    protected JarFileAccess(Logger logger, Path path) {
         super(true);
+        this.logger = logger;
         this.path = path;
         
         try {
@@ -49,7 +51,7 @@ public class JarFileAccess extends NIOFileAccess {
         }
     }
     
-    public static JarFileAccess of(Path root) throws IOException {
+    public static JarFileAccess of(Logger logger, Path root) throws IOException {
         synchronized (INTERFACES) {
             if (INTERFACES.containsKey(root)) {
                 return INTERFACES.get(root);
@@ -61,7 +63,7 @@ public class JarFileAccess extends NIOFileAccess {
                 }
             }
             
-            JarFileAccess outputInterface = new JarFileAccess(root);
+            JarFileAccess outputInterface = new JarFileAccess(logger, root);
             INTERFACES.put(root, outputInterface);
             return outputInterface;
         }
@@ -76,7 +78,7 @@ public class JarFileAccess extends NIOFileAccess {
     public void close() throws IOException {
         super.close();
         if (fs.closeIfPossible()) {
-            Logger.debug("Closed File Systems for " + path);
+            logger.debug("Closed File Systems for " + path);
         }
         INTERFACES.remove(path, this);
     }

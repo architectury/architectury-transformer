@@ -42,7 +42,7 @@ public class RuntimeMixinRefmapDetector implements AssetEditTransformer {
         output.handle((path, bytes) -> {
             String trimmedPath = Transform.trimSlashes(path);
             if (trimmedPath.endsWith(".json") && !trimmedPath.contains("/") && !trimmedPath.contains("\\")) {
-                Logger.debug("Checking whether " + path + " is a mixin config.");
+                context.getLogger().debug("Checking whether " + path + " is a mixin config.");
                 try (InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(bytes))) {
                     JsonObject json = gson.fromJson(reader, JsonObject.class);
                     if (json != null) {
@@ -50,7 +50,7 @@ public class RuntimeMixinRefmapDetector implements AssetEditTransformer {
                         boolean hasClient = json.has("client") && json.get("client").isJsonArray();
                         boolean hasServer = json.has("server") && json.get("server").isJsonArray();
                         if (json.has("package") && json.has("refmap") && (hasMixins || hasClient || hasServer)) {
-                            Logger.error("Mixin Config [%s] contains 'refmap', please remove it so it works in development environment!", trimmedPath);
+                            context.getLogger().error("Mixin Config [%s] contains 'refmap', please remove it so it works in development environment!", trimmedPath);
                         }
                     }
                 } catch (Exception ignored) {

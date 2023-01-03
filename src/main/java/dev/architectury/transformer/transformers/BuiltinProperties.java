@@ -35,4 +35,18 @@ public class BuiltinProperties {
     public static final String REFMAP_NAME = "architectury.refmap.name";
     public static final String MCMETA_VERSION = "architectury.mcmeta.version";
     public static final String PLATFORM_NAME = "architectury.platform.name";
+
+    public static final String[] KEYS = new String[]{
+        VERBOSE,
+        DEBUG_OUTPUT,
+        LOCATION,
+        MIXIN_MAPPINGS,
+        INJECT_INJECTABLES,
+        UNIQUE_IDENTIFIER,
+        COMPILE_CLASSPATH,
+        MAPPINGS_WITH_SRG,
+        REFMAP_NAME,
+        MCMETA_VERSION,
+        PLATFORM_NAME
+    };
 }

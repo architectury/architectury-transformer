@@ -32,75 +32,91 @@ import java.util.Comparator;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-public class Logger {
-    private static String previousLocation = null;
-    private static Boolean verbose = null;
-    private static PrintWriter writer;
-    
-    private Logger() {}
-    
-    private static PrintWriter getWriter() {
-        String dir = System.getProperty(BuiltinProperties.LOCATION, System.getProperty("user.dir"));
-        if (writer == null || !Objects.equals(dir, previousLocation)) {
-            previousLocation = dir;
-            if (writer != null) {
-                writer.close();
-            }
-            try {
-                File logFile = new File(dir, ".architectury-transformer/debug.log");
-                if (logFile.getParentFile().exists()) {
-                    try (Stream<Path> walk = Files.walk(logFile.getParentFile().toPath())) {
-                        walk.sorted(Comparator.reverseOrder())
-                                .map(Path::toFile)
-                                .forEach(File::delete);
-                    }
+public class Logger implements AutoCloseable {
+    private final String location;
+    private final boolean verbose;
+
+    private PrintWriter writer;
+
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    public Logger(String location, boolean verbose) {
+        this.location = location;
+        this.verbose = verbose;
+        try {
+            File logFile = new File(location, ".architectury-transformer/debug.log");
+            if (logFile.getParentFile().exists()) {
+                try (Stream<Path> walk = Files.walk(logFile.getParentFile().toPath())) {
+                    walk.sorted(Comparator.reverseOrder())
+                        .map(Path::toFile)
+                        .forEach(File::delete);
                 }
-                logFile.getParentFile().mkdirs();
-                writer = new PrintWriter(new FileWriter(logFile, false), true);
-            } catch (IOException exception) {
-                throw new UncheckedIOException(exception);
             }
+            logFile.getParentFile().mkdirs();
+            writer = new PrintWriter(new FileWriter(logFile, false), true);
+        } catch (IOException exception) {
+            throw new UncheckedIOException(exception);
         }
-        return writer;
     }
-    
-    public static void info(String str) {
+
+    public void info(String str) {
         String s = "[Architectury Transformer] " + str;
         System.out.println(s);
-        getWriter().println(s);
+        this.writer.println(s);
     }
-    
-    public static void info(String str, Object... args) {
+
+    public void info(String str, Object... args) {
         info(String.format(str, args));
     }
-    
-    public static void debug(String str) {
+
+    public void debug(String str) {
         String s = "[Architectury Transformer DEBUG] " + str;
         if (isVerbose()) {
             System.out.println(s);
         }
-        getWriter().println(s);
+        this.writer.println(s);
     }
-    
-    public static void debug(String str, Object... args) {
+
+    public void debug(String str, Object... args) {
         debug(String.format(str, args));
     }
-    
-    public static boolean isVerbose() {
-        if (verbose == null) {
-            verbose = System.getProperty(BuiltinProperties.VERBOSE, "false").equals("true");
-        }
-        
-        return verbose;
-    }
-    
-    public static void error(String str) {
+
+    public void error(String str) {
         String s = "[Architectury Transformer] " + str;
         System.err.println(s);
-        getWriter().println(s);
+        this.writer.println(s);
     }
-    
-    public static void error(String str, Object... args) {
+
+    public void error(String str, Object... args) {
         error(String.format(str, args));
+    }
+
+    public boolean isVerbose() {
+        return verbose;
+    }
+
+    @Override
+    public void close() throws Exception {
+        writer.close();
+    }
+
+
+    private static Logger cachedLogger = null;
+
+    @Deprecated
+    public static Logger getDefaultLogger() {
+        String location = System.getProperty(BuiltinProperties.LOCATION, System.getProperty("user.dir"));
+        Logger logger = cachedLogger;
+        if (logger == null || !Objects.equals(location, logger.location)) {
+            if (logger != null) {
+                try {
+                    logger.close();
+                } catch (Exception e) {
+                    //;
+                }
+            }
+            logger = new Logger(location, System.getProperty(BuiltinProperties.VERBOSE, "false").equals("true"));
+            cachedLogger = logger;
+        }
+        return logger;
     }
 }

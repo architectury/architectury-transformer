@@ -61,20 +61,20 @@ public class SimpleTransformerHandler implements TransformHandler {
     @Override
     public void handle(String input, FileAccess output, List<Transformer> transformers) throws Exception {
         if (closed) throw new IllegalStateException("Cannot transform when the handler is closed already!");
-        Logger.debug("Transforming from " + input + " to " + output + " with " + transformers.size() + " transformer(s) on " + getClass().getName());
+        context.getLogger().debug("Transforming from " + input + " to " + output + " with " + transformers.size() + " transformer(s) on " + getClass().getName());
         
-        final Set<IMappingProvider> mappingProviders = collectMappings(transformers);
+        final Set<IMappingProvider> mappingProviders = collectMappings(context, transformers);
         
         if (!mappingProviders.isEmpty()) {
-            Logger.debug("Remapping with " + mappingProviders.size() + " mapping provider(s):");
+            context.getLogger().debug("Remapping with " + mappingProviders.size() + " mapping provider(s):");
             for (IMappingProvider provider : mappingProviders) {
-                Logger.debug(" - " + provider);
+                context.getLogger().debug(" - " + provider);
             }
             remapTR(mappingProviders, input, output);
         }
         
         if (anyTransformerModifiesClass(transformers)) {
-            Logger.debug("Found class transformer");
+            context.getLogger().debug("Found class transformer");
             output.handle(path -> path.endsWith(".class"), (path, bytes) -> {
                 try {
                     applyTransforms(transformers, path, bytes, output);
@@ -83,7 +83,7 @@ public class SimpleTransformerHandler implements TransformHandler {
                 }
             });
         } else {
-            Logger.debug("No class transformer");
+            context.getLogger().debug("No class transformer");
         }
         
         if (nested) {
@@ -102,12 +102,12 @@ public class SimpleTransformerHandler implements TransformHandler {
         editFiles(transformers, output);
     }
     
-    private Set<IMappingProvider> collectMappings(List<Transformer> transformers) throws Exception {
+    private Set<IMappingProvider> collectMappings(TransformerContext context, List<Transformer> transformers) throws Exception {
         final Set<IMappingProvider> mappings = new HashSet<>();
         
         for (Transformer transformer : transformers) {
             if (transformer instanceof TinyRemapperTransformer) {
-                mappings.addAll(((TinyRemapperTransformer) transformer).collectMappings());
+                mappings.addAll(((TinyRemapperTransformer) transformer).collectMappings(context));
             }
         }
         return mappings;
@@ -143,8 +143,8 @@ public class SimpleTransformerHandler implements TransformHandler {
     private void debugRemapper(TinyRemapper remapper) throws Exception {
         Field classMapField = remapper.getClass().getDeclaredField("classMap");
         classMapField.setAccessible(true);
-        Logger.debug("Remapping Classes:");
-        ((Map<?, ?>) classMapField.get(remapper)).forEach((from, to) -> Logger.debug(from + " -> " + to));
+        context.getLogger().debug("Remapping Classes:");
+        ((Map<?, ?>) classMapField.get(remapper)).forEach((from, to) -> context.getLogger().debug(from + " -> " + to));
     }
     
     protected TinyRemapper getRemapper(Set<IMappingProvider> providers) throws Exception {
@@ -218,7 +218,7 @@ public class SimpleTransformerHandler implements TransformHandler {
     private ClassNode editNode(List<Transformer> transformers, String path, ClassNode node, ClassEditTransformer.Options options) {
         for (Transformer transformer : transformers) {
             if (transformer instanceof ClassEditTransformer) {
-                node = Objects.requireNonNull(((ClassEditTransformer) transformer).doEdit(path, node, options));
+                node = Objects.requireNonNull(((ClassEditTransformer) transformer).doEdit(context, path, node, options));
             }
         }
         
@@ -226,7 +226,7 @@ public class SimpleTransformerHandler implements TransformHandler {
     }
     
     private byte[] toByteArray(FileAccess output, ClassNode node, boolean computeMaxs, boolean computeFrames) {
-        Logger.debug("Writing " + node.name + " with maxs=" + computeMaxs + " frames=" + computeFrames);
+        context.getLogger().debug("Writing " + node.name + " with maxs=" + computeMaxs + " frames=" + computeFrames);
         final ClassWriter writer = new TransformerClassWriter(classpath, output, (computeMaxs ? ClassWriter.COMPUTE_MAXS : 0) | (computeFrames ? ClassWriter.COMPUTE_FRAMES : 0));
         node.accept(writer);
         return writer.toByteArray();
@@ -249,5 +249,10 @@ public class SimpleTransformerHandler implements TransformHandler {
         this.context = null;
         this.classpath = null;
         this.closed = true;
+    }
+
+    @Override
+    public TransformerContext getContext() {
+        return context;
     }
 }

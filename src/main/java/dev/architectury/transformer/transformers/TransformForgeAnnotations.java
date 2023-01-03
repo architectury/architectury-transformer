@@ -24,6 +24,7 @@
 package dev.architectury.transformer.transformers;
 
 import dev.architectury.transformer.transformers.base.ClassEditTransformer;
+import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
@@ -47,7 +48,7 @@ public class TransformForgeAnnotations implements ClassEditTransformer {
     private static final String ONLY_IN = "net/minecraftforge/api/distmarker/OnlyIn";
     
     @Override
-    public ClassNode doEdit(String name, ClassNode node) {
+    public ClassNode doEdit(TransformerContext context, String name, ClassNode node) {
         if ((node.access & Opcodes.ACC_INTERFACE) == 0) {
             if (node.visibleAnnotations != null && node.visibleAnnotations.stream().anyMatch(
                     annotation -> Objects.equals(annotation.desc, FORGE_EVENT) || Objects.equals(annotation.desc, FORGE_EVENT_CANCELLABLE)

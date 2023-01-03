@@ -36,6 +36,7 @@ import dev.architectury.transformer.transformers.base.AssetEditTransformer;
 import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.util.Logger;
 import net.fabricmc.mapping.tree.*;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
@@ -57,11 +58,11 @@ public class FixForgeMixin implements AssetEditTransformer {
     public void doEdit(TransformerContext context, FileAccess output) throws Exception {
         Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
         List<String> mixinConfigs = new ArrayList<>();
-        String refmap = System.getProperty(BuiltinProperties.REFMAP_NAME);
+        String refmap = context.getProperty(BuiltinProperties.REFMAP_NAME);
         output.handle((path, bytes) -> {
             String trimmedPath = Transform.trimSlashes(path);
             if (trimmedPath.endsWith(".json") && !trimmedPath.contains("/") && !trimmedPath.contains("\\")) {
-                Logger.debug("Checking whether " + path + " is a mixin config.");
+                context.getLogger().debug("Checking whether " + path + " is a mixin config.");
                 try (InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(bytes))) {
                     JsonObject json = gson.fromJson(reader, JsonObject.class);
                     if (json != null) {
@@ -77,12 +78,12 @@ public class FixForgeMixin implements AssetEditTransformer {
             }
         });
         if (!mixinConfigs.isEmpty()) {
-            Logger.debug("Found mixin config(s): " + String.join(",", mixinConfigs));
+            context.getLogger().debug("Found mixin config(s): " + String.join(",", mixinConfigs));
         }
         if (context.canModifyAssets()) {
             output.modifyFile("META-INF/MANIFEST.MF", bytes -> {
                 try {
-                    Logger.debug("Injecting MixinConfigs into /META-INF/MANIFEST.MF");
+                    context.getLogger().debug("Injecting MixinConfigs into /META-INF/MANIFEST.MF");
                     Manifest manifest = new Manifest(new ByteArrayInputStream(bytes));
                     manifest.getMainAttributes().putValue("MixinConfigs", String.join(",", mixinConfigs));
                     ByteArrayOutputStream stream = new ByteArrayOutputStream();
@@ -97,13 +98,13 @@ public class FixForgeMixin implements AssetEditTransformer {
                 context.appendArgument("--mixin.config", config);
             }
         } else {
-            Logger.error("Failed to inject mixin config!");
+            context.getLogger().error("Failed to inject mixin config!");
         }
         if (refmap != null) {
-            Logger.debug("Remapping refmap from intermediary to srg: " + refmap);
+            context.getLogger().debug("Remapping refmap from intermediary to srg: " + refmap);
             output.modifyFile(refmap, bytes -> {
                 try {
-                    readSrg();
+                    readSrg(context);
                     
                     SimpleReferenceRemapper referenceRemapper = new SimpleReferenceRemapper(new SimpleReferenceRemapper.Remapper() {
                         @Override
@@ -142,15 +143,14 @@ public class FixForgeMixin implements AssetEditTransformer {
                         @Override
                         public String remapSimple(String key, String value) {
                             String remapped = super.remapSimple(key, value);
-                            Logger.debug("Remapped refmap value " + value + " -> " + remapped);
+                            context.getLogger().debug("Remapped refmap value " + value + " -> " + remapped);
                             return remapped;
                         }
                     };
                     
                     return RefmapRemapper.remap(new Remapper() {
                         @Override
-                        @Nullable
-                        public MappingsRemapper remapMappings() {
+                        public @NotNull MappingsRemapper remapMappings() {
                             return className -> referenceRemapper;
                         }
                         
@@ -171,9 +171,9 @@ public class FixForgeMixin implements AssetEditTransformer {
         }
     }
     
-    private void readSrg() throws IOException {
+    private void readSrg(TransformerContext context) throws IOException {
         if (srg == null) {
-            Path srgMappingsPath = Paths.get(System.getProperty(BuiltinProperties.MAPPINGS_WITH_SRG));
+            Path srgMappingsPath = Paths.get(context.getProperty(BuiltinProperties.MAPPINGS_WITH_SRG));
             try (BufferedReader reader = Files.newBufferedReader(srgMappingsPath)) {
                 srg = TinyMappingFactory.loadWithDetection(reader);
             }

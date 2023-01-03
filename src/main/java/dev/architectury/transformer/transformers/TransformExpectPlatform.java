@@ -53,12 +53,12 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
     
     @Override
     public void doEdit(TransformerContext context, FileAccess output) throws Exception {
-        if (!RemapInjectables.isInjectInjectables()) return;
-        String className = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods";
-        output.addClass(className, buildPlatformMethodClass(className));
+        if (!RemapInjectables.isInjectInjectables(context)) return;
+        String className = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier(context)) + "/PlatformMethods";
+        output.addClass(className, buildPlatformMethodClass(context, className));
     }
     
-    private byte[] buildPlatformMethodClass(String className) {
+    private byte[] buildPlatformMethodClass(TransformerContext context, String className) {
         /* Generates the following class:
          * public final class PlatformMethods {
          *   public static String getCurrentTarget() {
@@ -66,7 +66,7 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
          *   }
          * }
          */
-        String platform = System.getProperty(BuiltinProperties.PLATFORM_NAME);
+        String platform = context.getProperty(BuiltinProperties.PLATFORM_NAME);
         Preconditions.checkNotNull(platform, BuiltinProperties.PLATFORM_NAME + " is not present!");
         
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -83,22 +83,22 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
     }
     
     @Override
-    public ClassNode doEdit(String name, ClassNode node) {
-        if (!RemapInjectables.isInjectInjectables()) return node;
+    public ClassNode doEdit(TransformerContext context, String name, ClassNode node) {
+        if (!RemapInjectables.isInjectInjectables(context)) return node;
         for (MethodNode method : node.methods) {
             String platformMethodsClass = null;
             
             if (method.visibleAnnotations != null && method.visibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM_LEGACY))) {
                 platformMethodsClass = "me/shedaniel/architectury/PlatformMethods";
             } else if (method.invisibleAnnotations != null && method.invisibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM))) {
-                platformMethodsClass = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods";
+                platformMethodsClass = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier(context)) + "/PlatformMethods";
             } else if (method.invisibleAnnotations != null && method.invisibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM_LEGACY2))) {
-                platformMethodsClass = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods";
+                platformMethodsClass = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier(context)) + "/PlatformMethods";
             }
             
             if (platformMethodsClass != null) {
                 if ((method.access & Opcodes.ACC_STATIC) == 0) {
-                    Logger.error("@ExpectPlatform can only apply to static methods!");
+                    context.getLogger().error("@ExpectPlatform can only apply to static methods!");
                 } else {
                     method.instructions.clear();
                     Type type = Type.getMethodType(method.desc);
@@ -109,7 +109,7 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
                         stackIndex += argumentType.getSize();
                     }
                     
-                    method.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, getPlatformClass(node.name), method.name, method.desc));
+                    method.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, getPlatformClass(context, node.name), method.name, method.desc));
                     method.instructions.add(new InsnNode(type.getReturnType().getOpcode(Opcodes.IRETURN)));
                     
                     method.maxStack = -1;
@@ -124,8 +124,8 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
         return node;
     }
     
-    private static String getPlatformClass(String lookupClass) {
-        String platform = System.getProperty(BuiltinProperties.PLATFORM_NAME);
+    private static String getPlatformClass(TransformerContext context, String lookupClass) {
+        String platform = context.getProperty(BuiltinProperties.PLATFORM_NAME);
         Preconditions.checkNotNull(platform, BuiltinProperties.PLATFORM_NAME + " is not present!");
         if (platform.equals("quilt")) platform = "fabric";
         String lookupType = lookupClass.replace("$", "") + "Impl";

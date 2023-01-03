@@ -62,7 +62,7 @@ public class ClassTransformerFileAccess implements ClassFileTransformer {
                 Transform.measureTime(() -> {
                     handler.handle(className + ".class", new Access(className, classBytes, originalSource), transformers);
                 }, duration -> {
-                    Logger.debug("Transformed " + className + " in " + formatDuration(duration));
+                    handler.getContext().getLogger().debug("Transformed " + className + " in " + formatDuration(duration));
                 });
                 if (debugOut != null) {
                     debugOut.addFile(className + ".class", classBytes.get());

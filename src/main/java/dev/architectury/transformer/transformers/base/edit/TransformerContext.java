@@ -23,6 +23,8 @@
 
 package dev.architectury.transformer.transformers.base.edit;
 
+import dev.architectury.transformer.util.Logger;
+
 public interface TransformerContext {
     void appendArgument(String... args);
     
@@ -31,4 +33,13 @@ public interface TransformerContext {
     boolean canAppendArgument();
     
     boolean canAddClasses();
+
+    String getProperty(String key);
+
+    default String getProperty(String key, String defaultValue) {
+        String value = getProperty(key);
+        return value == null ? defaultValue : value;
+    }
+
+    Logger getLogger();
 }

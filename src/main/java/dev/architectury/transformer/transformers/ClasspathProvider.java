@@ -23,20 +23,19 @@
 
 package dev.architectury.transformer.transformers;
 
-import dev.architectury.transformer.Transform;
 import dev.architectury.transformer.util.Logger;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 @FunctionalInterface
 public interface ClasspathProvider {
-    static ClasspathProvider fromProperties() {
-        return () -> Stream.of(Transform.getClasspath())
+    static ClasspathProvider fromProperties(String classPaths) {
+        return () -> Arrays.stream(classPaths.split(File.pathSeparator))
                 .map(Paths::get)
                 .filter(Files::exists)
                 .toArray(Path[]::new);
@@ -58,12 +57,12 @@ public interface ClasspathProvider {
                 .toArray(Path[]::new);
     }
     
-    default ClasspathProvider logging() {
+    default ClasspathProvider logging(Logger logger) {
         return () -> {
             Path[] paths = provide();
-            Logger.debug("Provided " + paths.length + " classpath jar(s):");
+            logger.debug("Provided " + paths.length + " classpath jar(s):");
             for (Path path : paths) {
-                Logger.debug(" - " + path.toString());
+                logger.debug(" - " + path.toString());
             }
             return paths;
         };

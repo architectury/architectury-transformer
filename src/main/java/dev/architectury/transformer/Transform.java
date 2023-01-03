@@ -40,10 +40,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -51,29 +48,32 @@ import java.util.stream.Stream;
 import static java.util.concurrent.TimeUnit.*;
 
 public class Transform {
-    public static String getUniqueIdentifier() {
-        return System.getProperty(BuiltinProperties.UNIQUE_IDENTIFIER);
-    }
-    
-    public static boolean isInjectInjectables() {
-        return System.getProperty(BuiltinProperties.INJECT_INJECTABLES, "true").equals("true");
-    }
-    
-    public static String[] getClasspath() {
-        return System.getProperty(BuiltinProperties.COMPILE_CLASSPATH, "true").split(File.pathSeparator);
-    }
-    
+    @Deprecated
     public static void runTransformers(Path input, Path output, List<Transformer> transformers) throws Exception {
-        TransformerContext context = new SimpleTransformerContext(args -> {throw new IllegalStateException();},
-                true, false, true);
-        ClasspathProvider classpath = ClasspathProvider.fromProperties().filter(path -> {
+        runTransformers(input, output, transformers, null);
+    }
+
+    public static void runTransformers(
+        Path input,
+        Path output,
+        List<Transformer> transformers,
+        Map<String, String> properties
+    ) throws Exception {
+        TransformerContext context = new SimpleTransformerContext(
+            args -> {throw new IllegalStateException();},
+            true,
+            false,
+            true,
+            properties
+        );
+        ClasspathProvider classpath = ClasspathProvider.fromProperties(context.getProperty(BuiltinProperties.COMPILE_CLASSPATH, "true")).filter(path -> {
             return !Objects.equals(input.toFile().getAbsoluteFile(), path.toFile().getAbsoluteFile());
         });
-        Logger.debug("Transforming " + transformers.size() + " transformer(s) from " + input.toString() + " to " + output.toString() + ": ");
+        context.getLogger().debug("Transforming " + transformers.size() + " transformer(s) from " + input.toString() + " to " + output.toString() + ": ");
         for (Transformer transformer : transformers) {
-            Logger.debug(" - " + transformer.toString());
+            context.getLogger().debug(" - " + transformer.toString());
         }
-        logTime(() -> {
+        logTime(context.getLogger(), () -> {
             if (Files.isDirectory(input)) {
                 copyDirectory(input, output);
                 try (OpenedFileAccess outputInterface = OpenedFileAccess.ofDirectory(output)) {
@@ -81,36 +81,54 @@ public class Transform {
                 }
             } else {
                 Files.copy(input, output, StandardCopyOption.REPLACE_EXISTING);
-                try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(output)) {
+                try (OpenedFileAccess outputInterface = OpenedFileAccess.ofJar(context.getLogger(), output)) {
                     runTransformers(context, classpath, input.toString(), outputInterface, transformers);
                 }
             }
         }, "Transformed jar with " + transformers.size() + " transformer(s)");
     }
-    
-    public static void runTransformers(TransformerContext context, ClasspathProvider classpath, String input, FileAccess output, List<Transformer> transformers)
-            throws Exception {
-        runTransformers(context, ReadClasspathProvider.of(classpath), input, output, transformers);
+
+    public static void runTransformers(
+        TransformerContext context,
+        ClasspathProvider classpath,
+        String input,
+        FileAccess output,
+        List<Transformer> transformers
+    )
+        throws Exception {
+        runTransformers(context, ReadClasspathProvider.of(context.getLogger(),classpath), input, output, transformers);
     }
-    
-    public static void runTransformers(TransformerContext context, ReadClasspathProvider classpath, String input, FileAccess output, List<Transformer> transformers)
-            throws Exception {
+
+    public static void runTransformers(
+        TransformerContext context,
+        ReadClasspathProvider classpath,
+        String input,
+        FileAccess output,
+        List<Transformer> transformers
+    )
+        throws Exception {
         runTransformers(context, classpath, input, output, transformers, false);
     }
-    
-    public static void runTransformers(TransformerContext context, ReadClasspathProvider classpath, String input, FileAccess output, List<Transformer> transformers,
-            boolean nested) throws Exception {
+
+    public static void runTransformers(
+        TransformerContext context,
+        ReadClasspathProvider classpath,
+        String input,
+        FileAccess output,
+        List<Transformer> transformers,
+        boolean nested
+    ) throws Exception {
         try (SimpleTransformerHandler handler = new SimpleTransformerHandler(classpath, context, nested)) {
             handler.handle(input, output, transformers);
         }
     }
-    
-    public static void logTime(DoThing doThing, String task) throws Exception {
+
+    public static void logTime(Logger logger, DoThing doThing, String task) throws Exception {
         measureTime(doThing, (duration) -> {
-            Logger.info(task + " in " + formatDuration(duration));
+            logger.info(task + " in " + formatDuration(duration));
         });
     }
-    
+
     public static void measureTime(DoThing doThing, Consumer<Duration> measured) throws Exception {
         long current = System.nanoTime();
         doThing.doThing();
@@ -118,11 +136,11 @@ public class Transform {
         Duration duration = Duration.ofNanos(finished - current);
         measured.accept(duration);
     }
-    
+
     public static String trimSlashes(String string) {
         return string == null ? null : trimLeadingSlash(trimEndingSlash(string));
     }
-    
+
     public static String trimLeadingSlash(String string) {
         if (string.startsWith(File.separator)) {
             return string.substring(File.separator.length());
@@ -131,7 +149,7 @@ public class Transform {
         }
         return string;
     }
-    
+
     public static String trimEndingSlash(String string) {
         if (string.endsWith(File.separator)) {
             return string.substring(string.length() - File.separator.length());
@@ -140,12 +158,12 @@ public class Transform {
         }
         return string;
     }
-    
+
     @FunctionalInterface
     public interface DoThing {
         void doThing() throws Exception;
     }
-    
+
     /*
      * Copyright (C) 2008 The Guava Authors
      *
@@ -161,19 +179,19 @@ public class Transform {
      */
     public static String formatDuration(Duration duration) {
         long nanos = duration.toNanos();
-        
+
         TimeUnit unit = chooseUnit(nanos);
         double value = (double) nanos / NANOSECONDS.convert(1, unit);
-        
+
         return formatCompact4Digits(value) + " " + abbreviate(unit);
     }
-    
+
     private static void copyDirectory(Path src, Path dest) throws IOException {
         if (Files.exists(dest)) {
             try (Stream<Path> walk = Files.walk(dest)) {
                 walk.sorted(Comparator.reverseOrder())
-                        .map(Path::toFile)
-                        .forEach(File::delete);
+                    .map(Path::toFile)
+                    .forEach(File::delete);
             }
         }
         try (Stream<Path> stream = Files.walk(src)) {
@@ -186,11 +204,11 @@ public class Transform {
             });
         }
     }
-    
+
     private static String formatCompact4Digits(double value) {
         return String.format(Locale.ROOT, "%.4g", value);
     }
-    
+
     private static TimeUnit chooseUnit(long nanos) {
         if (DAYS.convert(nanos, NANOSECONDS) > 0) {
             return DAYS;
@@ -212,7 +230,7 @@ public class Transform {
         }
         return NANOSECONDS;
     }
-    
+
     private static String abbreviate(TimeUnit unit) {
         switch (unit) {
             case NANOSECONDS:

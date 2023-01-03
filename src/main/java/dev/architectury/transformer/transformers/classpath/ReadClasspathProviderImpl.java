@@ -26,6 +26,7 @@ package dev.architectury.transformer.transformers.classpath;
 import dev.architectury.transformer.Transform;
 import dev.architectury.transformer.input.MemoryFileAccess;
 import dev.architectury.transformer.transformers.ClasspathProvider;
+import dev.architectury.transformer.util.Logger;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -42,11 +43,13 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class ReadClasspathProviderImpl implements ReadClasspathProvider {
+    private final Logger logger;
     private final ClasspathProvider provider;
-    private Map<String, Integer> map = new HashMap<>();
+    private final Map<String, Integer> map = new HashMap<>();
     private byte[][] classpaths;
     
-    public ReadClasspathProviderImpl(ClasspathProvider provider) {
+    public ReadClasspathProviderImpl(Logger logger, ClasspathProvider provider) {
+        this.logger = logger;
         this.provider = provider;
     }
     
@@ -56,7 +59,7 @@ public class ReadClasspathProviderImpl implements ReadClasspathProvider {
             if (classpaths == null) {
                 map.clear();
                 try {
-                    Transform.logTime(() -> {
+                    Transform.logTime(logger, () -> {
                         ExecutorService threadPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
                         List<CompletableFuture<List<Map.Entry<String, byte[]>>>> futures = new ArrayList<>();
                         List<Closeable> fsToClose = Collections.synchronizedList(new ArrayList<>());

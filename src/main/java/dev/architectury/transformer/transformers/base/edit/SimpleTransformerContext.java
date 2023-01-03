@@ -23,6 +23,11 @@
 
 package dev.architectury.transformer.transformers.base.edit;
 
+import dev.architectury.transformer.transformers.BuiltinProperties;
+import dev.architectury.transformer.util.Logger;
+
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Consumer;
 
 public final class SimpleTransformerContext implements TransformerContext {
@@ -30,31 +35,73 @@ public final class SimpleTransformerContext implements TransformerContext {
     private final boolean canModifyAssets;
     private final boolean canAppendArgument;
     private final boolean canAddClasses;
-    
-    public SimpleTransformerContext(Consumer<String[]> appendArgument, boolean canModifyAssets, boolean canAppendArgument, boolean canAddClasses) {
+    private final Map<String, String> properties;
+    private final Logger logger;
+
+    @Deprecated
+    public SimpleTransformerContext(
+        Consumer<String[]> appendArgument,
+        boolean canModifyAssets,
+        boolean canAppendArgument,
+        boolean canAddClasses
+    ) {
+        this(appendArgument, canModifyAssets, canAppendArgument, canAddClasses, null);
+    }
+
+    public SimpleTransformerContext(
+        Consumer<String[]> appendArgument,
+        boolean canModifyAssets,
+        boolean canAppendArgument,
+        boolean canAddClasses,
+        Map<String, String> properties
+    ) {
         this.appendArgument = appendArgument;
         this.canModifyAssets = canModifyAssets;
         this.canAppendArgument = canAppendArgument;
         this.canAddClasses = canAddClasses;
+        this.properties = new HashMap<>();
+        for (String key : BuiltinProperties.KEYS) {
+            String value = System.getProperty(key);
+            if (value != null) {
+                this.properties.put(key, value);
+            }
+        }
+        if (properties != null) {
+            this.properties.putAll(properties);
+        }
+        this.logger = new Logger(
+            getProperty(BuiltinProperties.LOCATION, System.getProperty("user.dir")),
+            getProperty(BuiltinProperties.VERBOSE, "false").equals("true")
+        );
     }
-    
+
     @Override
     public void appendArgument(String... args) {
         appendArgument.accept(args);
     }
-    
+
     @Override
     public boolean canModifyAssets() {
         return canModifyAssets;
     }
-    
+
     @Override
     public boolean canAppendArgument() {
         return canAppendArgument;
     }
-    
+
     @Override
     public boolean canAddClasses() {
         return canAddClasses;
+    }
+
+    @Override
+    public String getProperty(String key) {
+        return properties.get(key);
+    }
+
+    @Override
+    public Logger getLogger() {
+        return logger;
     }
 }
