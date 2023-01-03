@@ -63,7 +63,7 @@ public final class SimpleTransformerContext implements TransformerContext {
         for (String key : BuiltinProperties.KEYS) {
             String value = System.getProperty(key);
             if (value != null) {
-                properties.put(key, value);
+                this.properties.put(key, value);
             }
         }
         if (properties != null) {
