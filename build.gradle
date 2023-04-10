@@ -4,7 +4,7 @@ plugins {
     id "eclipse"
     id "maven-publish"
     id "com.github.johnrengelman.shadow" version "5.0.0"
-    id "org.cadixdev.licenser" version "0.5.0"
+    id "org.cadixdev.licenser" version "0.6.1"
 }
 
 group "dev.architectury"
@@ -20,7 +20,11 @@ if (!isSnapshot) {
 
 logger.lifecycle(":building architectury transformer v${version}")
 
-sourceCompatibility = targetCompatibility = 1.8
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(8)
+    }
+}
 
 repositories {
     maven { url "https://maven.architectury.dev/" }
