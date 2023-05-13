@@ -258,7 +258,12 @@ public class TransformerRuntime {
     private static void applyProperties() throws IOException {
         Path propertiesPath = Paths.get(System.getProperty(PROPERTIES));
         Properties properties = new Properties();
-        properties.load(new ByteArrayInputStream(Files.readAllBytes(propertiesPath)));
+        try (Reader reader = Files.newBufferedReader(propertiesPath, StandardCharsets.UTF_8)) {
+            // We'll manually set the encoding to UTF-8. Properties.load(InputStream) forces
+            // the ISO 8859-1 encoding, which leads to incorrect reading of these files.
+            // New versions of the Architectury Plugin write these files using UTF-8 too, so they should match.
+            properties.load(reader);
+        }
         properties.forEach((o, o2) -> System.setProperty((String) o, (String) o2));
     }
     
