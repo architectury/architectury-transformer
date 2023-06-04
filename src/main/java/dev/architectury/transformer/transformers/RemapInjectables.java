@@ -54,6 +54,7 @@ public class RemapInjectables implements ClassEditTransformer {
     
     @Override
     public ClassNode doEdit(String name, ClassNode node) {
+        if (!isInjectInjectables()) return node; // no need to edit the class
         String newName = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods";
         ClassNode newNode = new ClassNode();
         Remapper remapper = new Remapper() {
