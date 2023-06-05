@@ -25,23 +25,25 @@ package dev.architectury.transformer.transformers;
 
 import com.google.common.base.MoreObjects;
 import com.google.gson.JsonObject;
-import dev.architectury.tinyremapper.IMappingProvider;
-import dev.architectury.transformer.transformers.base.TinyRemapperTransformer;
+import dev.architectury.transformer.transformers.base.ClassEditTransformer;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.commons.ClassRemapper;
+import org.objectweb.asm.commons.Remapper;
+import org.objectweb.asm.tree.ClassNode;
 
 import java.io.File;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * Remap architectury injectables calls to the injected classes.
  */
-public class RemapInjectables implements TinyRemapperTransformer {
+public class RemapInjectables implements ClassEditTransformer {
     public static final String EXPECT_PLATFORM_LEGACY = "Lme/shedaniel/architectury/ExpectPlatform;";
     public static final String EXPECT_PLATFORM_LEGACY2 = "Lme/shedaniel/architectury/annotations/ExpectPlatform;";
     public static final String EXPECT_PLATFORM = "Ldev/architectury/injectables/annotations/ExpectPlatform;";
     public static final String EXPECT_PLATFORM_TRANSFORMED = "Ldev/architectury/injectables/annotations/ExpectPlatform$Transformed;";
     public static final String PLATFORM_ONLY_LEGACY = "Lme/shedaniel/architectury/annotations/PlatformOnly;";
     public static final String PLATFORM_ONLY = "Ldev/architectury/injectables/annotations/PlatformOnly;";
+    private static final String ARCHITECTURY_TARGET = "dev/architectury/injectables/targets/ArchitecturyTarget";
     private String uniqueIdentifier = null;
     
     @Override
@@ -51,16 +53,23 @@ public class RemapInjectables implements TinyRemapperTransformer {
     }
     
     @Override
-    public List<IMappingProvider> collectMappings() throws Exception {
-        if (isInjectInjectables()) {
-            return Collections.singletonList(sink -> {
-                sink.acceptClass(
-                        "dev/architectury/injectables/targets/ArchitecturyTarget",
-                        MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods"
-                );
-            });
-        }
-        return Collections.emptyList();
+    public ClassNode doEdit(String name, ClassNode node) {
+        if (!isInjectInjectables()) return node; // no need to edit the class
+        String newName = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods";
+        ClassNode newNode = new ClassNode();
+        Remapper remapper = new Remapper() {
+            @Override
+            public String map(String internalName) {
+                if (ARCHITECTURY_TARGET.equals(internalName)) {
+                    return newName;
+                }
+                
+                return internalName;
+            }
+        };
+        ClassVisitor cv = new ClassRemapper(newNode, remapper);
+        node.accept(cv);
+        return newNode;
     }
     
     public static String getUniqueIdentifier() {
