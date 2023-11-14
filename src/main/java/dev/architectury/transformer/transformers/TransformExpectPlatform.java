@@ -129,7 +129,10 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
     }
     
     private static String getPlatformClass(@Nullable String platformPackage, String lookupClass) {
-        String platform = MoreObjects.firstNonNull(platformPackage, System.getProperty(BuiltinProperties.PLATFORM_PACKAGE));
+        String platform = platformPackage;
+        if (platform == null) {
+            platform = System.getProperty(BuiltinProperties.PLATFORM_PACKAGE);
+        }
         if (platform == null) {
             platform = System.getProperty(BuiltinProperties.PLATFORM_NAME);
             Preconditions.checkNotNull(platform, BuiltinProperties.PLATFORM_NAME + " is not present!");
