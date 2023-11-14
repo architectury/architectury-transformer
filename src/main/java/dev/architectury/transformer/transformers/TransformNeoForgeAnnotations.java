@@ -26,16 +26,8 @@ package dev.architectury.transformer.transformers;
 /**
  * Handle @ForgeEvent and @ForgeEventCancellable and promote @Environment from being an invisible annotation to being an visible annotation.
  */
-public class TransformForgeAnnotations extends TransformForgeLikeAnnotations {
-    public static final String FORGE_EVENT_LEGACY = "Lme/shedaniel/architectury/ForgeEvent;";
-    public static final String FORGE_EVENT = "Ldev/architectury/annotations/ForgeEvent;";
-    public static final String FORGE_EVENT_CANCELLABLE_LEGACY = "Lme/shedaniel/architectury/ForgeEventCancellable;";
-    public static final String FORGE_EVENT_CANCELLABLE = "Ldev/architectury/annotations/ForgeEventCancellable;";
-    public static final String CANCELABLE = "Lnet/minecraftforge/eventbus/api/Cancelable;";
-    
-    private static final String ONLY_IN = "net/minecraftforge/api/distmarker/OnlyIn";
-    
-    public TransformForgeAnnotations() {
-        super(ONLY_IN);
+public class TransformNeoForgeAnnotations extends TransformForgeLikeAnnotations {
+    public TransformNeoForgeAnnotations() {
+        super(NEOFORGE_ONLY_IN);
     }
 }

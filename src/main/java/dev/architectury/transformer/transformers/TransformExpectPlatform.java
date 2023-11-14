@@ -128,6 +128,7 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
         String platform = System.getProperty(BuiltinProperties.PLATFORM_NAME);
         Preconditions.checkNotNull(platform, BuiltinProperties.PLATFORM_NAME + " is not present!");
         if (platform.equals("quilt")) platform = "fabric";
+        if (platform.equals("neoforge")) platform = "forge";
         String lookupType = lookupClass.replace("$", "") + "Impl";
         
         return lookupType.substring(0, lookupType.lastIndexOf('/')) + "/" + platform + "/" +
