@@ -36,4 +36,5 @@ public class BuiltinProperties {
     public static final String MCMETA_VERSION = "architectury.mcmeta.version";
     public static final String PLATFORM_NAME = "architectury.platform.name";
     public static final String PLATFORM_PACKAGE = "architectury.platform.package";
+    public static final String NEOFORGE_LIKE_REMAPS = "architectury.neoforge.forgelike_remaps";
 }
