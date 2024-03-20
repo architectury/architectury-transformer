@@ -123,6 +123,7 @@ shadowJar {
     relocate "dev.architectury.refmapremapper", "dev.architectury.transformer.shadowed.impl.dev.architectury.refmapremapper"
     configurations = [project.configurations.runtimeClasspath]
     classifier "shadow"
+    exclude "module-info.class"
 }
 
 task mainJar(type: Jar, dependsOn: shadowJar) {
