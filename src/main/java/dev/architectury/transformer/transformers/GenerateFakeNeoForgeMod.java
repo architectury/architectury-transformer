@@ -43,6 +43,12 @@ public class GenerateFakeNeoForgeMod extends AbstractFakeMod {
                 "license = \"Generated\"\n" +
                 "[[mods]]\n" +
                 "modId = \"" + fakeModId + "\"\n");
+        output.addFile("META-INF/neoforge.mods.toml",
+                "modLoader = \"javafml\"\n" +
+                        "loaderVersion = \"[1,)\"\n" +
+                        "license = \"Generated\"\n" +
+                        "[[mods]]\n" +
+                        "modId = \"" + fakeModId + "\"\n");
         output.addFile("pack.mcmeta",
                 "{\"pack\":{\"description\":\"Generated\",\"pack_format\":" + System.getProperty(BuiltinProperties.MCMETA_VERSION, "4") + "}}");
         output.addFile("generated" + fakeModId + "/" + fakeModId + ".class", generateClass(fakeModId));
