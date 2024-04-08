@@ -78,7 +78,8 @@ task agentJar(type: Jar) {
                 "Premain-Class": "dev.architectury.transformer.agent.TransformerAgent",
                 "Agent-Class": "dev.architectury.transformer.agent.TransformerAgent",
                 "Can-Redefine-Classes": true,
-                "Can-Retransform-Classes": true
+                "Can-Retransform-Classes": true,
+                "Automatic-Module-Name": "dev.architectury.transformer.agent"
         )
     }
     from sourceSets.agent.output
@@ -94,7 +95,8 @@ task runtimeJar(type: Jar, dependsOn: shadowJar) {
     manifest {
         attributes(
                 "Main-Class": "dev.architectury.transformer.TransformerRuntime",
-                "Implementation-Version": project.version
+                "Implementation-Version": project.version,
+                "Automatic-Module-Name": "dev.architectury.transformer.runtime"
         )
     }
     from {
@@ -123,6 +125,7 @@ shadowJar {
     relocate "dev.architectury.refmapremapper", "dev.architectury.transformer.shadowed.impl.dev.architectury.refmapremapper"
     configurations = [project.configurations.runtimeClasspath]
     classifier "shadow"
+    exclude "module-info.class"
 }
 
 task mainJar(type: Jar, dependsOn: shadowJar) {
