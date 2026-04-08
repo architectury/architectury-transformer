@@ -81,7 +81,7 @@ public class TransformForgeEnvironment implements TinyRemapperTransformer {
         if (System.getProperty(BuiltinProperties.MIXIN_MAPPINGS) == null) return providers;
         for (String path : System.getProperty(BuiltinProperties.MIXIN_MAPPINGS).split(File.pathSeparator)) {
             File mixinMapFile = Paths.get(path).toFile();
-            if (mixinMapFile.exists()) {
+            if (mixinMapFile.isFile()) {
                 Logger.debug("Reading mixin mappings file: " + mixinMapFile.getAbsolutePath());
                 providers.add(mixinMappingCache.computeIfAbsent(path, p -> sink -> {
                     TinyUtils.createTinyMappingProvider(mixinMapFile.toPath(), "named", "intermediary").load(new IMappingProvider.MappingAcceptor() {
