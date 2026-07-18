@@ -222,6 +222,8 @@ public class TransformerRuntime {
     
     private static void removeDuplicates(List<String> cpList, List<Map.Entry<Path, PathWithTransformersEntry>> tmpJars) throws IOException {
         List<Set<String>> tmpModules = new ArrayList<>();
+        Set<Path> jarsToRemove = new HashSet<>();
+
         for (Map.Entry<Path, PathWithTransformersEntry> tmpJar : tmpJars) {
             try (OpenedFileAccess og = OpenedFileAccess.ofJar(tmpJar.getValue().path)) {
                 Set<String> modules = new HashSet<>();
@@ -237,6 +239,9 @@ public class TransformerRuntime {
                 tmpModules.add(modules);
                 Logger.debug("Temporary jar [%s] contains packages: %s", tmpJar.getKey(), String.join(", ", modules));
             }
+
+            // Remove untransformed JAR from classpath
+            jarsToRemove.add(tmpJar.getValue().path);
         }
         
         cpList.removeIf(cp -> {
@@ -264,6 +269,12 @@ public class TransformerRuntime {
                             }
                         }
                     }
+                } else {
+                    if (jarsToRemove.contains(cpPath)) {
+                        Logger.info("Removing duplicate classpath entry: " + cpPath);
+                        return true;
+                    }
+                    return false;
                 }
             } catch (Throwable e) {
                 e.printStackTrace();
