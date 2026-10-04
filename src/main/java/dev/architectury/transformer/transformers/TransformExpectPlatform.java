@@ -23,84 +23,39 @@
 
 package dev.architectury.transformer.transformers;
 
-import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.gson.JsonObject;
-import dev.architectury.transformer.input.FileAccess;
-import dev.architectury.transformer.transformers.base.AssetEditTransformer;
 import dev.architectury.transformer.transformers.base.ClassEditTransformer;
-import dev.architectury.transformer.transformers.base.edit.TransformerContext;
 import dev.architectury.transformer.util.Logger;
 import org.jetbrains.annotations.Nullable;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.*;
+import org.objectweb.asm.tree.AnnotationNode;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.InsnNode;
+import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.VarInsnNode;
 
 import java.util.ArrayList;
-import java.util.Objects;
 
-import static dev.architectury.transformer.transformers.RemapInjectables.getUniqueIdentifier;
+import static dev.architectury.transformer.transformers.RemapInjectables.*;
 
-public class TransformExpectPlatform implements AssetEditTransformer, ClassEditTransformer {
+public class TransformExpectPlatform implements ClassEditTransformer {
     private String platformPackage = null;
-    private String uniqueIdentifier = null;
     
     @Override
     public void supplyProperties(JsonObject json) {
         platformPackage = json.has(BuiltinProperties.PLATFORM_PACKAGE) ?
                 json.getAsJsonPrimitive(BuiltinProperties.PLATFORM_PACKAGE).getAsString() : null;
-        uniqueIdentifier = json.has(BuiltinProperties.UNIQUE_IDENTIFIER) ?
-                json.getAsJsonPrimitive(BuiltinProperties.UNIQUE_IDENTIFIER).getAsString() : null;
-    }
-    
-    @Override
-    public void doEdit(TransformerContext context, FileAccess output) throws Exception {
-        if (!RemapInjectables.isInjectInjectables()) return;
-        String className = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods";
-        output.addClass(className, buildPlatformMethodClass(className));
-    }
-    
-    private byte[] buildPlatformMethodClass(String className) {
-        /* Generates the following class:
-         * public final class PlatformMethods {
-         *   public static String getCurrentTarget() {
-         *     return platform;
-         *   }
-         * }
-         */
-        String platform = System.getProperty(BuiltinProperties.PLATFORM_NAME);
-        Preconditions.checkNotNull(platform, BuiltinProperties.PLATFORM_NAME + " is not present!");
-        
-        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL, className, null, "java/lang/Object", null);
-        {
-            MethodVisitor method = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "getCurrentTarget", "()Ljava/lang/String;", null, null);
-            method.visitLdcInsn(platform);
-            method.visitInsn(Opcodes.ARETURN);
-            method.visitMaxs(0, 0);
-            method.visitEnd();
-        }
-        writer.visitEnd();
-        return writer.toByteArray();
     }
     
     @Override
     public ClassNode doEdit(String name, ClassNode node) {
         if (!RemapInjectables.isInjectInjectables()) return node;
         for (MethodNode method : node.methods) {
-            String platformMethodsClass = null;
-            
-            if (method.visibleAnnotations != null && method.visibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM_LEGACY))) {
-                platformMethodsClass = "me/shedaniel/architectury/PlatformMethods";
-            } else if (method.invisibleAnnotations != null && method.invisibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM))) {
-                platformMethodsClass = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods";
-            } else if (method.invisibleAnnotations != null && method.invisibleAnnotations.stream().anyMatch(it -> Objects.equals(it.desc, RemapInjectables.EXPECT_PLATFORM_LEGACY2))) {
-                platformMethodsClass = MoreObjects.firstNonNull(uniqueIdentifier, getUniqueIdentifier()) + "/PlatformMethods";
-            }
-            
-            if (platformMethodsClass != null) {
+            if (method.invisibleAnnotations != null && method.invisibleAnnotations.stream().anyMatch(it -> EXPECT_PLATFORM.equals(it.desc) || EXPECT_PLATFORM_LEGACY2.equals(it.desc)) ||
+                method.visibleAnnotations != null && method.visibleAnnotations.stream().anyMatch(it -> EXPECT_PLATFORM_LEGACY.equals(it.desc))) {
                 if ((method.access & Opcodes.ACC_STATIC) == 0) {
                     Logger.error("@ExpectPlatform can only apply to static methods!");
                 } else {
@@ -132,13 +87,14 @@ public class TransformExpectPlatform implements AssetEditTransformer, ClassEditT
         String platform = platformPackage;
         if (platform == null) {
             platform = System.getProperty(BuiltinProperties.PLATFORM_PACKAGE);
+            if (platform == null) {
+                platform = System.getProperty(BuiltinProperties.PLATFORM_NAME);
+                Preconditions.checkNotNull(platform, BuiltinProperties.PLATFORM_NAME + " is not present!");
+                if (platform.equals("quilt"))
+                    platform = "fabric";
+            }
         }
-        if (platform == null) {
-            platform = System.getProperty(BuiltinProperties.PLATFORM_NAME);
-            Preconditions.checkNotNull(platform, BuiltinProperties.PLATFORM_NAME + " is not present!");
-            if (platform.equals("quilt")) platform = "fabric";
-        }
-        
+
         String lookupType = lookupClass.replace("$", "") + "Impl";
         
         return lookupType.substring(0, lookupType.lastIndexOf('/')) + "/" + platform + "/" +
